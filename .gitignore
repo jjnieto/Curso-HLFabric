@@ -1,0 +1,22 @@
+# Archivos temporales de PowerPoint
+~$*.pptx
+~$*.docx
+~$*.xlsx
+
+# Archivos temporales de macOS / Windows
+.DS_Store
+Thumbs.db
+
+# Carpetas de IDE
+.vscode/
+.idea/
+
+# Caché de Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Backups locales
+*.bak
+*.backup
+*.old
