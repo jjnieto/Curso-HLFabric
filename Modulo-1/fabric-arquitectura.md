@@ -114,8 +114,6 @@ graph TB
         end
 
         P1 <-->|"Gossip<br/>inter-org"| P2
-        P1 -->|"Bloques"| ORD
-        P2 -->|"Bloques"| ORD
         ORD -->|"Distribuye<br/>bloques"| P1
         ORD -->|"Distribuye<br/>bloques"| P2
         ORD -->|"Distribuye<br/>bloques"| P1b
@@ -325,11 +323,11 @@ graph LR
             B2 -->|"..."| B3
         end
 
-        subgraph WS["📦 World State (estado actual)"]
+        subgraph WS["📦 World State del canal comercio (estado actual)"]
             DB["LevelDB o CouchDB"]
-            K1["coche_001 → Honda Civic, azul, propietario: Ana"]
-            K2["coche_002 → Toyota Yaris, rojo, propietario: Luis"]
-            K3["coche_003 → Ford Focus, negro, propietario: María"]
+            K1["prod_001 → Café Premium 250g, stock 1.200, precio mayorista 4,50€"]
+            K2["prod_002 → Té Verde 100g, stock 800, precio mayorista 3,20€"]
+            K3["pedido_452 → Org2 (Minorista), 50 unid de prod_001, 2026-04-15"]
         end
     end
 
@@ -385,8 +383,9 @@ graph TD
     style RED fill:#FAFAFA,stroke:#424242
 ```
 
-**Org1** no ve nada de lo que pasa en el canal de facturación.
-**Org2** no ve nada de lo que pasa en el canal de logística.
+**Org1** (Fabricante) no ve nada de lo que pasa en el canal de facturación.
+**Org2** (Minorista) no ve nada de lo que pasa en el canal de logística.
+**Org3** (Distribuidor) participa en los tres canales: es el nodo conector entre fabricante y minorista, y mantiene tres ledgers, uno por canal.
 Cada canal tiene su propio ledger independiente.
 
 ---
