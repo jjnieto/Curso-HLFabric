@@ -105,7 +105,8 @@ async function checkFabricOrg(org) {
 
     try {
         const result = await ctx.contract.evaluateTransaction('GetAllDocuments');
-        const docs = JSON.parse(new TextDecoder().decode(result));
+        const text = new TextDecoder().decode(result).trim();
+        const docs = text === '' || text === 'null' ? [] : JSON.parse(text);
         ok(`Query GetAllDocuments como ${org} (${docs.length} documento(s) en el ledger)`);
         detail(`mspId=${ctx.identity.mspId}`);
     } catch (err) {
