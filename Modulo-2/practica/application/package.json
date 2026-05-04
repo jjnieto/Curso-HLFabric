@@ -4,6 +4,7 @@
   "description": "App cliente para SignChain — workflow de aprobación de documentos",
   "private": true,
   "scripts": {
+    "check": "node sanity-check.js",
     "create": "node crear-documento.js",
     "sign": "node firmar-documento.js",
     "query": "node consultar-documento.js"
