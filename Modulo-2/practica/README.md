@@ -19,25 +19,48 @@ Requisitos previos:
 - Go >= 1.21
 - Binarios de Fabric (`peer`, `configtxgen`, `cryptogen`, `osnadmin`, `fabric-ca-client`) en el `PATH`
 
-Pasos:
+### 1. Bajar solo esta práctica
+
+Tienes dos formas. Si solo quieres trastear con la práctica y no necesitas el resto del curso, **descarga el tarball** (rápido, sin `.git`):
 
 ```bash
-# 1. Clonar y entrar
-git clone https://github.com/jjnieto/Curso-HLFabric.git
-cd Curso-HLFabric/Modulo-2/practica
+curl -L https://github.com/jjnieto/Curso-HLFabric/archive/refs/heads/main.tar.gz \
+  | tar xz --strip-components=1 Curso-HLFabric-main/Modulo-2/practica
+cd Modulo-2/practica
 
-# 2. Asegurar que los binarios de Fabric están en el PATH
-#    (si los descargaste con install-fabric.sh en otra ruta, ajusta esto)
+# El tarball pierde los bits de ejecución. Restáuralos:
+chmod +x scripts/*.sh
+```
+
+Si prefieres clonar el repo (para `git pull` posteriores) pero solo este directorio, usa sparse-checkout:
+
+```bash
+git clone --no-checkout --depth 1 --filter=blob:none \
+  https://github.com/jjnieto/Curso-HLFabric.git
+cd Curso-HLFabric
+git sparse-checkout init --cone
+git sparse-checkout set Modulo-2/practica
+git checkout main
+cd Modulo-2/practica
+```
+
+O simplemente clona el repo entero si te da igual el tamaño (`git clone https://github.com/jjnieto/Curso-HLFabric.git && cd Curso-HLFabric/Modulo-2/practica`).
+
+### 2. Levantar la red y la app
+
+```bash
+# Asegúrate de que los binarios de Fabric están en el PATH
+# (si los descargaste con install-fabric.sh en otra ruta, ajusta esto)
 export PATH=$HOME/practica01/bin:$PATH
 export FABRIC_CFG_PATH=$HOME/practica01/config
 
-# 3. Arrancar la red (CAs -> MSPs -> red -> chaincode)
+# Arrancar la red (CAs -> MSPs -> red -> chaincode)
 bash scripts/01-setup-cas.sh
 bash scripts/02-build-msps.sh
 bash scripts/03-start-network.sh
 bash scripts/04-deploy-chaincode.sh
 
-# 4. App cliente
+# App cliente
 cd application
 npm install
 export SIGNCHAIN_NETWORK_PATH="$(cd .. && pwd)/network"
