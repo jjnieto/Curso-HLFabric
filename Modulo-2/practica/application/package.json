@@ -1,0 +1,18 @@
+{
+  "name": "signchain-app",
+  "version": "1.0.0",
+  "description": "App cliente para SignChain — workflow de aprobación de documentos",
+  "private": true,
+  "scripts": {
+    "create": "node crear-documento.js",
+    "sign": "node firmar-documento.js",
+    "query": "node consultar-documento.js"
+  },
+  "dependencies": {
+    "@hyperledger/fabric-gateway": "^1.5.0",
+    "@grpc/grpc-js": "^1.9.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

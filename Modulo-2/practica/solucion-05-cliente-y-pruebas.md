@@ -1,6 +1,8 @@
 # Solución 05: Aplicación cliente y pruebas end-to-end
 
 > **Recordatorio:** este documento asume que ya tienes el chaincode `signchain` desplegado en la red, como se describe en [solucion-04-chaincode.md](solucion-04-chaincode.md).
+>
+> **Código listo para ejecutar:** los archivos completos (con su `package.json`, `utils/`, etc.) viven en [`application/`](application/). Para instalar dependencias y lanzar las pruebas tienes una guía rápida en [`application/README.md`](application/README.md). Este documento explica el **diseño y el porqué**.
 
 ## Objetivo
 

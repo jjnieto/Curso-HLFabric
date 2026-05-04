@@ -1,0 +1,155 @@
+# SignChain — Aplicación cliente
+
+App Node.js que usa el Fabric Gateway SDK para crear, firmar y verificar documentos contra el chaincode `signchain`.
+
+> El **diseño detallado**, la teoría y las **respuestas a las preguntas guía** están en [`../solucion-05-cliente-y-pruebas.md`](../solucion-05-cliente-y-pruebas.md). Este README es solo la guía rápida para **compilar, configurar y ejecutar** el código.
+
+## Requisitos previos
+
+| | Mínimo |
+|---|---|
+| Node.js | 18 LTS |
+| npm | 9+ |
+| Red SignChain levantada | Sí (ver `solucion-02..04`) |
+| Chaincode `signchain` desplegado y commiteado | Sí (ver `solucion-04-chaincode.md`) |
+
+Comprueba que tienes la red en marcha antes de ejecutar nada:
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'orderer|peer|couchdb|ca\.'
+```
+
+Debes ver: `orderer.signchain.com`, `peer0.cliente.signchain.com`, `peer0.proveedor.signchain.com`, dos CouchDB y las tres CAs.
+
+## Estructura
+
+```
+application/
+├── package.json
+├── crear-documento.js          # Cliente crea un documento nuevo
+├── firmar-documento.js         # Cliente o Proveedor firman un documento
+├── consultar-documento.js      # Lee + verifica hash y firmas
+├── utils/
+│   ├── fabric-connection.js    # Conexión al Gateway (lee cert+key del MSP)
+│   └── crypto.js               # SHA-256, ECDSA sign/verify, certID
+├── docs/                       # PDFs u otros documentos a firmar (vacío en git)
+└── README.md
+```
+
+## Instalación
+
+```bash
+cd Modulo-2/practica/application
+npm install
+```
+
+Esto baja `@hyperledger/fabric-gateway` y `@grpc/grpc-js`. No genera lockfile en git (cada alumno regenera el suyo).
+
+## Configuración
+
+Por defecto, los scripts buscan el material criptográfico de la red en:
+
+```
+$HOME/signchain/network/organizations/peerOrganizations/...
+```
+
+Si tu red está en otra ruta, exporta la variable de entorno **`SIGNCHAIN_NETWORK_PATH`**:
+
+```bash
+# Linux / WSL / macOS
+export SIGNCHAIN_NETWORK_PATH=/ruta/absoluta/a/signchain/network
+
+# PowerShell
+$env:SIGNCHAIN_NETWORK_PATH = "C:\ruta\a\signchain\network"
+```
+
+La conexión usa, para cada org:
+
+| Org | MSP ID | Endpoint peer | TLS host alias |
+|-----|--------|---------------|----------------|
+| Cliente   | `ClienteMSP`   | `localhost:7051` | `peer0.cliente.signchain.com`   |
+| Proveedor | `ProveedorMSP` | `localhost:9051` | `peer0.proveedor.signchain.com` |
+
+Si cambias puertos o dominios en tu red, edita `utils/fabric-connection.js` (objeto `ORG_CONFIG`).
+
+## Uso
+
+### 1. Preparar un documento de prueba
+
+```bash
+echo "Este es el contrato de prueba versión 1" > docs/contrato.pdf
+```
+
+Sirve cualquier archivo (PDF, txt, lo que sea): solo nos interesa su hash.
+
+### 2. Crear el documento (Cliente)
+
+```bash
+npm run create -- DOC-001 ./docs/contrato.pdf "Contrato 2026" "Servicios profesionales"
+```
+
+Equivale a:
+
+```bash
+node crear-documento.js DOC-001 ./docs/contrato.pdf "Contrato 2026" "Servicios profesionales"
+```
+
+### 3. Firmar (Cliente, después Proveedor)
+
+```bash
+node firmar-documento.js cliente   DOC-001 ./docs/contrato.pdf
+node firmar-documento.js proveedor DOC-001 ./docs/contrato.pdf
+```
+
+### 4. Consultar y verificar
+
+```bash
+node consultar-documento.js DOC-001 ./docs/contrato.pdf
+```
+
+Salida esperada con dos firmas válidas:
+
+```
+Documento:
+  ID:          DOC-001
+  Estado:      fully-approved
+  Firmas:      2
+
+Verificación de hash:
+  Coinciden:   SÍ
+
+Verificación de firmas:
+  ClienteMSP: VÁLIDA   (firmado en 2026-...)
+  ProveedorMSP: VÁLIDA (firmado en 2026-...)
+```
+
+## Casos de error útiles para probar
+
+| Caso | Cómo provocarlo | Error esperado |
+|------|-----------------|----------------|
+| Doble firma | Firmar dos veces con la misma org | `la organización X ya ha firmado este documento` |
+| Documento manipulado | Modificar `contrato.pdf` y firmar | `el hash del ledger NO coincide con el local` |
+| Crear con Proveedor | Cambiar `'cliente'` por `'proveedor'` en `crear-documento.js` | rechazo del chaincode (solo Cliente crea) |
+| Cancelar tras `fully-approved` | Invocar `CancelDocument` desde un script propio | `el documento ya está aprobado totalmente` |
+
+## Resolución de problemas
+
+**`ENOENT: no such file or directory, .../users/Admin@.../msp/signcerts`**
+Tu red no está montada o `SIGNCHAIN_NETWORK_PATH` apunta a una ruta incorrecta. Comprueba `ls $SIGNCHAIN_NETWORK_PATH/organizations/peerOrganizations`.
+
+**`Failed to connect before the deadline`**
+El peer no responde. Verifica con `docker logs peer0.cliente.signchain.com` que está arrancado y escuchando en `7051`.
+
+**`DESCRIPTOR_VERIFY_FAILED` o errores de TLS**
+El cert TLS del peer no incluye el host con el que conectas. Lo que firma la práctica es `peer0.cliente.signchain.com` con SAN `localhost`. Si cambiaste el dominio, regenera con esos SANs (ver `solucion-02-fabric-ca.md`).
+
+**`endorsement policy failure`**
+La política es `AND(Cliente, Proveedor)`. Las dos peers tienen que estar arriba durante el `submitTransaction`. Si tiras una, el endorsement falla.
+
+## Limpieza
+
+```bash
+rm -rf node_modules package-lock.json
+```
+
+El estado on-chain se reinicia parando la red y borrando volúmenes (ver `solucion-03-red-y-canal.md`, sección de limpieza).
