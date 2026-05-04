@@ -51,10 +51,10 @@ build_peer_org() {
     cp "$NETWORK_DIR/fabric-ca/$org/tls-cert.pem"          "$peer_dir/msp/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$peer_dir/msp/config.yaml"
 
-    # TLS del peer
-    cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/tlscacerts/"* "$peer_dir/tls/ca.crt"
-    cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/keystore/"*   "$peer_dir/tls/server.key"
-    cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/signcerts/"*  "$peer_dir/tls/server.crt"
+    # TLS del peer (el TLS root es el cert de la CA TLS — el mismo tls-cert.pem)
+    cp "$NETWORK_DIR/fabric-ca/$org/tls-cert.pem"               "$peer_dir/tls/ca.crt"
+    cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/keystore/"*   "$peer_dir/tls/server.key"
+    cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/signcerts/"*  "$peer_dir/tls/server.crt"
 
     # MSP local del admin
     local admin_dir="$org_dir/users/Admin@$domain/msp"
@@ -88,9 +88,9 @@ build_orderer_org() {
     cp "$NETWORK_DIR/fabric-ca/orderer/tls-cert.pem"            "$ord_dir/msp/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$ord_dir/msp/config.yaml"
 
-    cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/tlscacerts/"* "$ord_dir/tls/ca.crt"
-    cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/keystore/"*   "$ord_dir/tls/server.key"
-    cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/signcerts/"*  "$ord_dir/tls/server.crt"
+    cp "$NETWORK_DIR/fabric-ca/orderer/tls-cert.pem"                 "$ord_dir/tls/ca.crt"
+    cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/keystore/"*   "$ord_dir/tls/server.key"
+    cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/signcerts/"*  "$ord_dir/tls/server.crt"
 
     local admin_dir="$org_dir/users/Admin@$domain/msp"
     cp "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/cacerts/"*   "$admin_dir/cacerts/"
