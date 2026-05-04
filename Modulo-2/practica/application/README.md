@@ -85,7 +85,7 @@ bash scripts/04-deploy-chaincode.sh
 
 Hace el lifecycle completo: `go mod vendor` → `package` → `install` en cada peer → `approveformyorg` por cada org → `checkcommitreadiness` → `commit` con política `AND('ClienteMSP.peer','ProveedorMSP.peer')`.
 
-### Paso 6 — App cliente (estás aquí)
+### Paso 6 — App cliente CLI (estás aquí)
 
 ```bash
 cd application
@@ -97,7 +97,20 @@ export SIGNCHAIN_NETWORK_PATH="$(cd .. && pwd)/network"
 npm run check        # sanity check: te dice si todo lo anterior está bien
 ```
 
-Si el sanity check sale en verde, salta a la sección **Uso** más abajo para crear, firmar y consultar documentos.
+Si el sanity check sale en verde, ya puedes crear, firmar y consultar desde terminal (sección **Uso desde CLI** más abajo).
+
+### Paso 7 — Frontend web (opcional)
+
+Si prefieres operar desde el navegador con un selector de rol, drag-and-drop y badges de estado, hay un frontend en [`web/`](web/) que reusa los mismos `utils/` que los CLI:
+
+```bash
+cd web
+npm install
+export SIGNCHAIN_NETWORK_PATH="$(cd ../.. && pwd)/network"
+npm start                       # http://localhost:3000
+```
+
+Las transacciones lanzadas desde la web son indistinguibles de las que lanzas con `node crear-documento.js` — pegan al mismo chaincode en el mismo canal. Detalle en [`web/README.md`](web/README.md).
 
 ### Resumen visual
 
@@ -114,35 +127,16 @@ Si el sanity check sale en verde, salta a la sección **Uso** más abajo para cr
     |
 [ Paso 5 ] bash scripts/04-deploy-chaincode.sh --> signchain commiteado
     |
-[ Paso 6 ] cd application && npm install       --> APP LISTA
+[ Paso 6 ] cd application && npm install       --> CLI LISTO
            export SIGNCHAIN_NETWORK_PATH=...
            npm run check
+    |
+[ Paso 7 ] cd web && npm install && npm start  --> WEB LISTA  (opcional)
 ```
 
 Si algo falla a medias, `npm run check` del paso 6 te dirá dónde — los bloques 2, 3 y 4 del sanity check se corresponden con los pasos 3, 4 y 5 de esta guía.
 
-### Empezar de cero
-
-Si te has equivocado o quieres reiniciar:
-
-```bash
-cd Modulo-2/practica
-bash scripts/99-clean-all.sh    # baja contenedores, borra volúmenes y MSPs generados
-bash scripts/01-setup-cas.sh    # ...y vuelve a empezar
-```
-
-### Frontend web (opcional)
-
-Si prefieres operar desde el navegador (selector de rol, drag-and-drop, badges de estado), hay un frontend en [`web/`](web/):
-
-```bash
-cd web
-npm install
-export SIGNCHAIN_NETWORK_PATH="$(cd ../.. && pwd)/network"
-npm start                       # http://localhost:3000
-```
-
-Reusa los mismos `utils/` que los CLI, así que las transacciones que lances desde la web son indistinguibles de las que lances con `node crear-documento.js`. Detalle en [`web/README.md`](web/README.md).
+> **Para parar, pausar o reiniciar la red** (sin perder o perdiendo el estado), ve a la sección [Parar, reanudar y limpiar](#parar-reanudar-y-limpiar) al final del README.
 
 ---
 
@@ -160,14 +154,19 @@ Reusa los mismos `utils/` que los CLI, así que las transacciones que lances des
 ```
 application/
 ├── package.json
-├── sanity-check.js             # Comprueba todo el entorno antes de empezar
-├── crear-documento.js          # Cliente crea un documento nuevo
-├── firmar-documento.js         # Cliente o Proveedor firman un documento
-├── consultar-documento.js      # Lee + verifica hash y firmas
-├── utils/
+├── sanity-check.js             # Diagnóstico end-to-end (npm run check)
+├── crear-documento.js          # CLI: Cliente crea un documento nuevo
+├── firmar-documento.js         # CLI: Cliente o Proveedor firman
+├── consultar-documento.js      # CLI: lee + verifica hash y firmas
+├── utils/                      # Compartido por CLI y web
 │   ├── fabric-connection.js    # Conexión al Gateway (lee cert+key del MSP)
 │   └── crypto.js               # SHA-256, ECDSA sign/verify, certID
 ├── docs/                       # PDFs u otros documentos a firmar (vacío en git)
+├── web/                        # Frontend web (opcional)
+│   ├── package.json
+│   ├── server.js               # Express + REST API que llama al Gateway
+│   ├── public/                 # HTML + CSS + JS sin build step
+│   └── README.md
 └── README.md
 ```
 
@@ -295,7 +294,7 @@ Resultado: OK — todo listo para ejecutar la práctica.
 | `[WARN] Saltando la conexión Fabric porque hay errores previos` | Hay fallos en bloques 1-3 | Arregla esos primero |
 | Todo falla y no sabes por dónde tirar | Red en estado inconsistente | `bash ../scripts/99-clean-all.sh` y vuelve a empezar desde `01-setup-cas.sh` |
 
-## Uso
+## Uso desde CLI
 
 ### 1. Preparar un documento de prueba
 
@@ -346,6 +345,24 @@ Verificación de firmas:
   ProveedorMSP: VÁLIDA (firmado en 2026-...)
 ```
 
+## Uso desde la web
+
+```bash
+cd web
+npm install                # solo la primera vez
+export SIGNCHAIN_NETWORK_PATH="$(cd ../.. && pwd)/network"
+npm start                  # http://localhost:3000
+```
+
+En el navegador:
+
+1. Selecciona el rol en la cabecera (**Cliente** o **Proveedor**). Se guarda en `localStorage`, puedes cambiarlo en cualquier momento.
+2. Como Cliente, arrastra un archivo al panel "Crear documento", pon ID y título, y dale a **Crear**.
+3. Pulsa una tarjeta de la lista para abrir el detalle. Si tu rol todavía no firmó y el documento no está en estado terminal, te aparece **Firmar como ...** — sube el archivo original y se valida hash antes de firmar.
+4. La lista se refresca sola cada 10 s. También están **Rechazar** (con motivo) y **Cancelar** (solo el creador).
+
+Detalle, endpoints REST y troubleshooting específico en [`web/README.md`](web/README.md).
+
 ## Casos de error útiles para probar
 
 | Caso | Cómo provocarlo | Error esperado |
@@ -369,19 +386,78 @@ El cert TLS del peer no incluye el host con el que conectas. Lo que firma la pr�
 **`endorsement policy failure`**
 La política es `AND(Cliente, Proveedor)`. Las dos peers tienen que estar arriba durante el `submitTransaction`. Si tiras una, el endorsement falla.
 
-## Limpieza
+## Parar, reanudar y limpiar
 
-Solo dependencias de Node:
+Tres niveles de "apagar la red", de menos a más destructivo. Elige según lo que quieras hacer.
+
+### Nivel 1 — Pausa rápida (mantiene todo el estado)
+
+Útil cuando solo quieres apagar la máquina y seguir mañana donde lo dejaste. Documentos creados, firmas y chaincode commiteado se conservan tal cual.
 
 ```bash
-rm -rf node_modules package-lock.json
+# Para el frontend web (si está corriendo)
+# Ctrl+C en la terminal de `npm start`
+
+# Para los contenedores conservando volúmenes y datos
+cd Modulo-2/practica
+docker compose -f network/docker/docker-compose-net.yaml stop
+docker compose -f network/docker/docker-compose-ca.yaml stop
 ```
 
-Tear-down completo (red + MSPs + estado on-chain):
+Para volver a arrancar:
 
 ```bash
-cd ..                          # a practica/
+docker compose -f network/docker/docker-compose-ca.yaml start
+docker compose -f network/docker/docker-compose-net.yaml start
+```
+
+Y opcionalmente vuelve a levantar la web (`cd application/web && npm start`).
+
+### Nivel 2 — Borrar contenedores y volúmenes pero guardar el material crypto
+
+Pierdes el ledger (los documentos y sus firmas), pero conservas las CAs enrolladas y los MSPs construidos. Próxima vez te basta con los pasos 4 y 5:
+
+```bash
+cd Modulo-2/practica
+docker compose -f network/docker/docker-compose-net.yaml down -v
+docker compose -f network/docker/docker-compose-ca.yaml down -v
+
+# Para volver:
+bash scripts/03-start-network.sh
+bash scripts/04-deploy-chaincode.sh
+```
+
+### Nivel 3 — Tear-down total (vuelves a empezar de cero)
+
+Tira contenedores, volúmenes Docker, MSPs construidos, bloque génesis y `vendor/` del chaincode. La estructura del repo queda intacta.
+
+```bash
+cd Modulo-2/practica
 bash scripts/99-clean-all.sh
+
+# Para reconstruir todo:
+bash scripts/01-setup-cas.sh
+bash scripts/02-build-msps.sh
+bash scripts/03-start-network.sh
+bash scripts/04-deploy-chaincode.sh
 ```
 
-Esto baja todos los contenedores (CAs y red), borra volúmenes Docker, MSPs construidos, bloque génesis y vendor del chaincode. La estructura del repo queda intacta y puedes volver a empezar con `bash scripts/01-setup-cas.sh`.
+### Resumen
+
+| Quieres... | Comando |
+|------------|---------|
+| Apagar y seguir mañana | `docker compose ... stop` (nivel 1) |
+| Liberar disco sin perder identidades | `docker compose ... down -v` (nivel 2) |
+| Empezar de cero | `bash scripts/99-clean-all.sh` (nivel 3) |
+
+### Limpieza de Node (independiente)
+
+Si solo quieres reinstalar dependencias del CLI o la web:
+
+```bash
+# CLI
+rm -rf application/node_modules application/package-lock.json
+
+# Web
+rm -rf application/web/node_modules application/web/package-lock.json
+```
