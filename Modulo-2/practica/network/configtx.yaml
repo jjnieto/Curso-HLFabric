@@ -3,7 +3,7 @@ Organizations:
   - &OrdererOrg
     Name: OrdererMSP
     ID: OrdererMSP
-    MSPDir: ../organizations/ordererOrganizations/signchain.com/msp
+    MSPDir: organizations/ordererOrganizations/signchain.com/msp
     Policies:
       Readers:
         Type: Signature
@@ -20,7 +20,7 @@ Organizations:
   - &Cliente
     Name: ClienteMSP
     ID: ClienteMSP
-    MSPDir: ../organizations/peerOrganizations/cliente.signchain.com/msp
+    MSPDir: organizations/peerOrganizations/cliente.signchain.com/msp
     Policies:
       Readers:
         Type: Signature
@@ -41,7 +41,7 @@ Organizations:
   - &Proveedor
     Name: ProveedorMSP
     ID: ProveedorMSP
-    MSPDir: ../organizations/peerOrganizations/proveedor.signchain.com/msp
+    MSPDir: organizations/peerOrganizations/proveedor.signchain.com/msp
     Policies:
       Readers:
         Type: Signature
@@ -99,8 +99,8 @@ Orderer: &OrdererDefaults
     Consenters:
       - Host: orderer.signchain.com
         Port: 7050
-        ClientTLSCert: ../organizations/ordererOrganizations/signchain.com/orderers/orderer.signchain.com/tls/server.crt
-        ServerTLSCert: ../organizations/ordererOrganizations/signchain.com/orderers/orderer.signchain.com/tls/server.crt
+        ClientTLSCert: organizations/ordererOrganizations/signchain.com/orderers/orderer.signchain.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/signchain.com/orderers/orderer.signchain.com/tls/server.crt
   Organizations:
   Policies:
     Readers:
