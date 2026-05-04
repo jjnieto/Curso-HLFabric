@@ -4,22 +4,120 @@ App Node.js que usa el Fabric Gateway SDK para crear, firmar y verificar documen
 
 > El **diseño detallado**, la teoría y las **respuestas a las preguntas guía** están en [`../solucion-05-cliente-y-pruebas.md`](../solucion-05-cliente-y-pruebas.md). Este README es solo la guía rápida para **compilar, configurar y ejecutar** el código.
 
-## Requisitos previos
+---
 
-| | Mínimo |
-|---|---|
-| Node.js | 18 LTS |
-| npm | 9+ |
-| Red SignChain levantada | Sí (ver `solucion-02..04`) |
-| Chaincode `signchain` desplegado y commiteado | Sí (ver `solucion-04-chaincode.md`) |
+## Guía de instalación completa (de cero a app funcionando)
 
-Comprueba que tienes la red en marcha antes de ejecutar nada:
+La app cliente es **el último paso** de la práctica. Si todavía no tienes la red de Fabric levantada y el chaincode desplegado, sigue estos pasos en orden. Cada uno tiene su propio documento detallado en [`../`](..).
+
+### Paso 0 — Prerequisitos del sistema
+
+Necesitas:
+
+- **Docker** (>= 20) y **Docker Compose v2**
+- **Node.js >= 18** y **npm >= 9** (para la app cliente, paso 5)
+- **Go** (>= 1.20) si compilas el chaincode en Go
+- Binarios de Fabric (`peer`, `configtxgen`, `cryptogen`, `osnadmin`, `fabric-ca-client`) en el `PATH`. Se descargan con el script oficial:
+
+  ```bash
+  curl -sSL https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh | bash -s -- binary
+  export PATH=$PWD/bin:$PATH
+  export FABRIC_CFG_PATH=$PWD/config
+  ```
+
+Detalle completo en [`../../01-requisitos-e-instalacion.md`](../../01-requisitos-e-instalacion.md).
+
+### Paso 1 — Diseño (lectura, no instala nada)
+
+Lee [`../solucion-01-arquitectura.md`](../solucion-01-arquitectura.md) para entender las decisiones: 3 orgs (Cliente, Proveedor, OrdererOrg), 1 canal, política `AND`, modelo de datos del documento. Sin esto los pasos siguientes no tienen contexto.
+
+### Paso 2 — Fabric CAs e identidades
+
+```bash
+# Levanta las 3 Fabric CAs (cliente, proveedor, orderer)
+docker compose -f network/docker/docker-compose-ca.yaml up -d
+
+# Registra y enrolla peer0 + Admin de cada org, construye los MSPs
+bash scripts/01-setup-cas.sh
+bash scripts/02-build-msps.sh
+```
+
+Resultado: estructura `network/organizations/peerOrganizations/...` con los MSPs construidos. Detalle en [`../solucion-02-fabric-ca.md`](../solucion-02-fabric-ca.md).
+
+### Paso 3 — Red, canal y unión de peers
+
+```bash
+# Genera el bloque génesis a partir de configtx.yaml
+bash scripts/03-start-network.sh
+```
+
+Esto:
+
+1. Crea el bloque génesis del canal `signchain-channel`.
+2. Levanta el orderer, los 2 peers y los 2 CouchDBs (`docker-compose-net.yaml`).
+3. Llama a `osnadmin channel join` en el orderer.
+4. Hace `peer channel join` con cada peer.
+
+Comprueba con `docker ps`:
 
 ```bash
 docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'orderer|peer|couchdb|ca\.'
 ```
 
-Debes ver: `orderer.signchain.com`, `peer0.cliente.signchain.com`, `peer0.proveedor.signchain.com`, dos CouchDB y las tres CAs.
+Debes ver `orderer.signchain.com`, `peer0.cliente.signchain.com`, `peer0.proveedor.signchain.com`, los dos CouchDBs y las tres CAs. Detalle en [`../solucion-03-red-y-canal.md`](../solucion-03-red-y-canal.md).
+
+### Paso 4 — Chaincode `signchain`
+
+```bash
+bash scripts/04-deploy-chaincode.sh
+```
+
+Recorre el lifecycle: `package` → `install` (en cada peer) → `approveformyorg` (cada org) → `checkcommitreadiness` → `commit`. La política se aplica con:
+
+```bash
+--signature-policy "AND('ClienteMSP.peer','ProveedorMSP.peer')"
+```
+
+Detalle (con el código Go completo y todas las funciones) en [`../solucion-04-chaincode.md`](../solucion-04-chaincode.md).
+
+### Paso 5 — App cliente (estás aquí)
+
+```bash
+cd Modulo-2/practica/application
+npm install
+npm run check        # sanity check: te dice si todo lo anterior está bien
+```
+
+Si el sanity check sale en verde, ya puedes ejecutar el flujo end-to-end (ver sección "Uso" más abajo).
+
+### Resumen visual
+
+```
+[ Paso 0 ] Docker + Node + binarios de Fabric en el PATH
+    |
+[ Paso 1 ] Leer el diseño
+    |
+[ Paso 2 ] docker compose up CAs       --> identidades + MSPs
+    |
+[ Paso 3 ] docker compose up red       --> orderer + peers + canal
+    |
+[ Paso 4 ] lifecycle del chaincode     --> signchain commiteado
+    |
+[ Paso 5 ] npm install + npm run check --> APP LISTA
+```
+
+Si te has saltado algún paso o uno falló a medias, **`npm run check`** del paso 5 te dirá exactamente cuál — los bloques 2, 3 y 4 del sanity check se corresponden con los pasos 2, 3 y 4 de esta guía.
+
+---
+
+## Requisitos previos (resumen)
+
+| | Mínimo |
+|---|---|
+| Node.js | 18 LTS |
+| npm | 9+ |
+| Red SignChain levantada | Sí (paso 3 arriba) |
+| Chaincode `signchain` desplegado y commiteado | Sí (paso 4 arriba) |
 
 ## Estructura
 
