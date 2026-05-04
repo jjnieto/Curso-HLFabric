@@ -131,6 +131,19 @@ bash scripts/99-clean-all.sh    # baja contenedores, borra volúmenes y MSPs gen
 bash scripts/01-setup-cas.sh    # ...y vuelve a empezar
 ```
 
+### Frontend web (opcional)
+
+Si prefieres operar desde el navegador (selector de rol, drag-and-drop, badges de estado), hay un frontend en [`web/`](web/):
+
+```bash
+cd web
+npm install
+export SIGNCHAIN_NETWORK_PATH="$(cd ../.. && pwd)/network"
+npm start                       # http://localhost:3000
+```
+
+Reusa los mismos `utils/` que los CLI, así que las transacciones que lances desde la web son indistinguibles de las que lances con `node crear-documento.js`. Detalle en [`web/README.md`](web/README.md).
+
 ---
 
 ## Requisitos previos (resumen)

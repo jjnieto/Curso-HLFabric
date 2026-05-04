@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SignChain</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand">
+                <span class="brand-mark"></span>
+                <h1>SignChain</h1>
+                <span class="brand-tag">Workflow de firma sobre Hyperledger Fabric</span>
+            </div>
+            <div class="role-switcher" data-role="cliente">
+                <span class="role-label">Operando como</span>
+                <select id="role-select">
+                    <option value="cliente">Cliente</option>
+                    <option value="proveedor">Proveedor</option>
+                </select>
+                <span class="msp-badge" id="msp-badge">ClienteMSP</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="panel" id="create-panel">
+            <header class="panel-head">
+                <h2>Crear documento</h2>
+                <p class="muted">Solo el rol <b>Cliente</b> puede crear nuevos documentos.</p>
+            </header>
+            <form id="create-form" class="form">
+                <div class="form-row">
+                    <label>
+                        ID del documento
+                        <input type="text" name="id" placeholder="DOC-001" required />
+                    </label>
+                    <label>
+                        Título
+                        <input type="text" name="title" placeholder="Contrato 2026" required />
+                    </label>
+                </div>
+                <label>
+                    Descripción
+                    <input type="text" name="description" placeholder="Servicios profesionales" />
+                </label>
+                <div class="dropzone" id="create-dropzone">
+                    <input type="file" name="file" id="create-file" hidden required />
+                    <div class="dropzone-empty">
+                        <span class="dropzone-icon"></span>
+                        <p>Arrastra el archivo aquí o <button type="button" class="link-btn" id="create-pick">selecciónalo</button></p>
+                        <p class="muted small">El archivo nunca sale de tu navegador. Se calcula su SHA-256 y solo el hash se sube al ledger.</p>
+                    </div>
+                    <div class="dropzone-filled" hidden>
+                        <span class="file-icon"></span>
+                        <span class="file-name"></span>
+                        <span class="file-size"></span>
+                        <button type="button" class="ghost small" id="create-clear">Cambiar</button>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="primary">Crear documento</button>
+                </div>
+            </form>
+        </section>
+
+        <section class="panel">
+            <header class="panel-head between">
+                <div>
+                    <h2>Documentos en el ledger</h2>
+                    <p class="muted">Estado actual de la cadena. Pulsa una tarjeta para ver el detalle o firmar.</p>
+                </div>
+                <button class="ghost" id="refresh-btn" title="Refrescar lista">↻ Refrescar</button>
+            </header>
+            <div class="docs-grid" id="docs-grid">
+                <p class="empty-state">Cargando…</p>
+            </div>
+        </section>
+    </main>
+
+    <div class="modal" id="modal" hidden>
+        <div class="modal-backdrop" data-close></div>
+        <div class="modal-card">
+            <header class="modal-head">
+                <h3 id="modal-title">Documento</h3>
+                <button class="ghost" data-close>✕</button>
+            </header>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
