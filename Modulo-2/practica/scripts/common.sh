@@ -10,9 +10,12 @@ export CHAINCODE_DIR="$SIGNCHAIN_ROOT/chaincode"
 
 CHANNEL_NAME="signchain-channel"
 CHAINCODE_NAME="signchain"
-CHAINCODE_VERSION="1.0"
+# Para un re-deploy, exporta CHAINCODE_VERSION y CHAINCODE_SEQUENCE distintos
+# antes de ejecutar 04-deploy-chaincode.sh, p. ej.:
+#   CHAINCODE_VERSION=1.1 CHAINCODE_SEQUENCE=2 bash scripts/04-deploy-chaincode.sh
+CHAINCODE_VERSION="${CHAINCODE_VERSION:-1.0}"
 CHAINCODE_LABEL="signchain_${CHAINCODE_VERSION}"
-CHAINCODE_SEQUENCE="1"
+CHAINCODE_SEQUENCE="${CHAINCODE_SEQUENCE:-1}"
 SIGNATURE_POLICY="AND('ClienteMSP.peer','ProveedorMSP.peer')"
 
 ORDERER_HOST="orderer.signchain.com"

@@ -26,7 +26,7 @@ type Document struct {
 	CreatedAt       string      `json:"createdAt"`
 	Status          string      `json:"status"`
 	Signatures      []Signature `json:"signatures"`
-	RejectionReason string      `json:"rejectionReason,omitempty"`
+	RejectionReason string      `json:"rejectionReason,omitempty" metadata:",optional"`
 }
 
 type Signature struct {
