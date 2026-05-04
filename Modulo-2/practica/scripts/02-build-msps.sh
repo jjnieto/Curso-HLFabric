@@ -38,9 +38,9 @@ build_peer_org() {
     mkdir -p "$org_dir"/peers/peer0.$domain/tls
     mkdir -p "$org_dir"/users/Admin@$domain/msp/{cacerts,tlscacerts,keystore,signcerts}
 
-    # El cert raíz de la CA TLS está en el msp/cacerts/ generado por el enroll TLS.
+    # El cert raíz de la CA TLS está en el msp/tlscacerts/ generado por el enroll TLS.
     # NO usar tls-cert.pem (ese es el cert HTTPS del proceso fabric-ca-server, no la CA).
-    local tls_ca_root="$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/cacerts"
+    local tls_ca_root="$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/tlscacerts"
 
     # MSP de la org (channel MSP)
     cp "$NETWORK_DIR/fabric-ca/$org/admin/msp/cacerts/"* "$org_dir/msp/cacerts/"
@@ -81,7 +81,7 @@ build_orderer_org() {
     mkdir -p "$org_dir"/orderers/orderer.signchain.com/tls
     mkdir -p "$org_dir"/users/Admin@$domain/msp/{cacerts,tlscacerts,keystore,signcerts}
 
-    local tls_ca_root="$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/cacerts"
+    local tls_ca_root="$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/tlscacerts"
 
     cp "$NETWORK_DIR/fabric-ca/orderer/admin/msp/cacerts/"* "$org_dir/msp/cacerts/"
     cp "$tls_ca_root/"*                                     "$org_dir/msp/tlscacerts/"
