@@ -38,9 +38,13 @@ build_peer_org() {
     mkdir -p "$org_dir"/peers/peer0.$domain/tls
     mkdir -p "$org_dir"/users/Admin@$domain/msp/{cacerts,tlscacerts,keystore,signcerts}
 
-    # MSP de la org
+    # El cert raíz de la CA TLS está en el msp/cacerts/ generado por el enroll TLS.
+    # NO usar tls-cert.pem (ese es el cert HTTPS del proceso fabric-ca-server, no la CA).
+    local tls_ca_root="$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/cacerts"
+
+    # MSP de la org (channel MSP)
     cp "$NETWORK_DIR/fabric-ca/$org/admin/msp/cacerts/"* "$org_dir/msp/cacerts/"
-    cp "$NETWORK_DIR/fabric-ca/$org/tls-cert.pem"        "$org_dir/msp/tlscacerts/"
+    cp "$tls_ca_root/"*                                  "$org_dir/msp/tlscacerts/"
     build_org_msp_yaml "$org_dir/msp"
 
     # MSP local del peer
@@ -48,11 +52,11 @@ build_peer_org() {
     cp "$NETWORK_DIR/fabric-ca/$org/peer0/msp/cacerts/"*   "$peer_dir/msp/cacerts/"
     cp "$NETWORK_DIR/fabric-ca/$org/peer0/msp/keystore/"*  "$peer_dir/msp/keystore/"
     cp "$NETWORK_DIR/fabric-ca/$org/peer0/msp/signcerts/"* "$peer_dir/msp/signcerts/"
-    cp "$NETWORK_DIR/fabric-ca/$org/tls-cert.pem"          "$peer_dir/msp/tlscacerts/"
+    cp "$tls_ca_root/"*                                    "$peer_dir/msp/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$peer_dir/msp/config.yaml"
 
-    # TLS del peer (el TLS root es el cert de la CA TLS — el mismo tls-cert.pem)
-    cp "$NETWORK_DIR/fabric-ca/$org/tls-cert.pem"               "$peer_dir/tls/ca.crt"
+    # TLS del peer
+    cp "$tls_ca_root/"*                                         "$peer_dir/tls/ca.crt"
     cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/keystore/"*   "$peer_dir/tls/server.key"
     cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/signcerts/"*  "$peer_dir/tls/server.crt"
 
@@ -61,7 +65,7 @@ build_peer_org() {
     cp "$NETWORK_DIR/fabric-ca/$org/$admin_user/msp/cacerts/"*   "$admin_dir/cacerts/"
     cp "$NETWORK_DIR/fabric-ca/$org/$admin_user/msp/keystore/"*  "$admin_dir/keystore/"
     cp "$NETWORK_DIR/fabric-ca/$org/$admin_user/msp/signcerts/"* "$admin_dir/signcerts/"
-    cp "$NETWORK_DIR/fabric-ca/$org/tls-cert.pem"                "$admin_dir/tlscacerts/"
+    cp "$tls_ca_root/"*                                          "$admin_dir/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$admin_dir/config.yaml"
 
     log_ok "$msp_id construido en $org_dir"
@@ -77,18 +81,20 @@ build_orderer_org() {
     mkdir -p "$org_dir"/orderers/orderer.signchain.com/tls
     mkdir -p "$org_dir"/users/Admin@$domain/msp/{cacerts,tlscacerts,keystore,signcerts}
 
+    local tls_ca_root="$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/cacerts"
+
     cp "$NETWORK_DIR/fabric-ca/orderer/admin/msp/cacerts/"* "$org_dir/msp/cacerts/"
-    cp "$NETWORK_DIR/fabric-ca/orderer/tls-cert.pem"        "$org_dir/msp/tlscacerts/"
+    cp "$tls_ca_root/"*                                     "$org_dir/msp/tlscacerts/"
     build_org_msp_yaml "$org_dir/msp"
 
     local ord_dir="$org_dir/orderers/orderer.signchain.com"
     cp "$NETWORK_DIR/fabric-ca/orderer/orderer/msp/cacerts/"*   "$ord_dir/msp/cacerts/"
     cp "$NETWORK_DIR/fabric-ca/orderer/orderer/msp/keystore/"*  "$ord_dir/msp/keystore/"
     cp "$NETWORK_DIR/fabric-ca/orderer/orderer/msp/signcerts/"* "$ord_dir/msp/signcerts/"
-    cp "$NETWORK_DIR/fabric-ca/orderer/tls-cert.pem"            "$ord_dir/msp/tlscacerts/"
+    cp "$tls_ca_root/"*                                         "$ord_dir/msp/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$ord_dir/msp/config.yaml"
 
-    cp "$NETWORK_DIR/fabric-ca/orderer/tls-cert.pem"                 "$ord_dir/tls/ca.crt"
+    cp "$tls_ca_root/"*                                              "$ord_dir/tls/ca.crt"
     cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/keystore/"*   "$ord_dir/tls/server.key"
     cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/signcerts/"*  "$ord_dir/tls/server.crt"
 
@@ -96,7 +102,7 @@ build_orderer_org() {
     cp "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/cacerts/"*   "$admin_dir/cacerts/"
     cp "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/keystore/"*  "$admin_dir/keystore/"
     cp "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/signcerts/"* "$admin_dir/signcerts/"
-    cp "$NETWORK_DIR/fabric-ca/orderer/tls-cert.pem"                 "$admin_dir/tlscacerts/"
+    cp "$tls_ca_root/"*                                              "$admin_dir/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$admin_dir/config.yaml"
 
     log_ok "OrdererMSP construido en $org_dir"
