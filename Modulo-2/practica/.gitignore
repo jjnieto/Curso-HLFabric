@@ -1,0 +1,20 @@
+# Datos generados por las CAs
+network/fabric-ca/cliente/*
+!network/fabric-ca/cliente/.gitkeep
+network/fabric-ca/proveedor/*
+!network/fabric-ca/proveedor/.gitkeep
+network/fabric-ca/orderer/*
+!network/fabric-ca/orderer/.gitkeep
+
+# MSPs construidos
+network/organizations/*
+!network/organizations/.gitkeep
+
+# Bloques génesis y artefactos del canal
+network/channel-artifacts/*
+!network/channel-artifacts/.gitkeep
+
+# Chaincode empaquetado y vendoring de Go
+chaincode/*.tar.gz
+chaincode/signchain/vendor/
+chaincode/signchain/go.sum

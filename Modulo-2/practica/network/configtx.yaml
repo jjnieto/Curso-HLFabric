@@ -1,0 +1,146 @@
+---
+Organizations:
+  - &OrdererOrg
+    Name: OrdererMSP
+    ID: OrdererMSP
+    MSPDir: ../organizations/ordererOrganizations/signchain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.signchain.com:7050
+
+  - &Cliente
+    Name: ClienteMSP
+    ID: ClienteMSP
+    MSPDir: ../organizations/peerOrganizations/cliente.signchain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('ClienteMSP.admin', 'ClienteMSP.peer', 'ClienteMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('ClienteMSP.admin', 'ClienteMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('ClienteMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('ClienteMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.cliente.signchain.com
+        Port: 7051
+
+  - &Proveedor
+    Name: ProveedorMSP
+    ID: ProveedorMSP
+    MSPDir: ../organizations/peerOrganizations/proveedor.signchain.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('ProveedorMSP.admin', 'ProveedorMSP.peer', 'ProveedorMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('ProveedorMSP.admin', 'ProveedorMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('ProveedorMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('ProveedorMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.proveedor.signchain.com
+        Port: 9051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.signchain.com
+        Port: 7050
+        ClientTLSCert: ../organizations/ordererOrganizations/signchain.com/orderers/orderer.signchain.com/tls/server.crt
+        ServerTLSCert: ../organizations/ordererOrganizations/signchain.com/orderers/orderer.signchain.com/tls/server.crt
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  SignChainChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Cliente
+        - *Proveedor
