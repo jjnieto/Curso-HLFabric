@@ -6,107 +6,130 @@ App Node.js que usa el Fabric Gateway SDK para crear, firmar y verificar documen
 
 ---
 
-## Guía de instalación completa (de cero a app funcionando)
+## Guía rápida de instalación (con scripts)
 
-La app cliente es **el último paso** de la práctica. Si todavía no tienes la red de Fabric levantada y el chaincode desplegado, sigue estos pasos en orden. Cada uno tiene su propio documento detallado en [`../`](..).
+La app cliente es el **último paso** de la práctica. Esta guía te lleva de un repo recién clonado a la app funcionando usando los **scripts automatizados** de `practica/scripts/`. Si prefieres montar la red **a mano** comando por comando, sigue los `solucion-XX.md` en lugar de esta guía.
+
+> Todos los `bash scripts/...` se ejecutan **desde `Modulo-2/practica/`** (un nivel por encima de este directorio), no desde `application/`.
 
 ### Paso 0 — Prerequisitos del sistema
 
-Necesitas:
+Necesitas en el host:
 
-- **Docker** (>= 20) y **Docker Compose v2**
-- **Node.js >= 18** y **npm >= 9** (para la app cliente, paso 5)
-- **Go** (>= 1.20) si compilas el chaincode en Go
-- Binarios de Fabric (`peer`, `configtxgen`, `cryptogen`, `osnadmin`, `fabric-ca-client`) en el `PATH`. Se descargan con el script oficial:
+- **Docker** (>= 20) y **Docker Compose v2** corriendo
+- **Node.js >= 18** y **npm >= 9**
+- **Go** (>= 1.21)
+- Binarios de Fabric (`peer`, `configtxgen`, `osnadmin`, `fabric-ca-client`) en el `PATH`
 
-  ```bash
-  curl -sSL https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh | bash -s -- binary
-  export PATH=$PWD/bin:$PATH
-  export FABRIC_CFG_PATH=$PWD/config
-  ```
-
-Detalle completo en [`../../01-requisitos-e-instalacion.md`](../../01-requisitos-e-instalacion.md).
-
-### Paso 1 — Diseño (lectura, no instala nada)
-
-Lee [`../solucion-01-arquitectura.md`](../solucion-01-arquitectura.md) para entender las decisiones: 3 orgs (Cliente, Proveedor, OrdererOrg), 1 canal, política `AND`, modelo de datos del documento. Sin esto los pasos siguientes no tienen contexto.
-
-### Paso 2 — Fabric CAs e identidades
+Si todavía no los tienes, descárgalos con el script oficial:
 
 ```bash
-# Levanta las 3 Fabric CAs (cliente, proveedor, orderer)
-docker compose -f network/docker/docker-compose-ca.yaml up -d
+curl -sSL https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh | bash -s -- binary
+export PATH=$PWD/bin:$PATH
+export FABRIC_CFG_PATH=$PWD/config
+```
 
-# Registra y enrolla peer0 + Admin de cada org, construye los MSPs
+Verifica:
+
+```bash
+peer version
+configtxgen --version
+fabric-ca-client version
+```
+
+### Paso 1 — Clonar y entrar en `practica/`
+
+```bash
+git clone https://github.com/jjnieto/Curso-HLFabric.git
+cd Curso-HLFabric/Modulo-2/practica
+```
+
+Todos los scripts (`01..04`, `99`) se invocan desde aquí.
+
+### Paso 2 — CAs e identidades
+
+```bash
 bash scripts/01-setup-cas.sh
+```
+
+Levanta las 3 Fabric CAs (Cliente, Proveedor, Orderer), enrolla el admin bootstrap de cada una y registra/enrolla `peer0` + admin de cada org. Genera todo el material crypto en `network/fabric-ca/`.
+
+### Paso 3 — Construir los MSPs
+
+```bash
 bash scripts/02-build-msps.sh
 ```
 
-Resultado: estructura `network/organizations/peerOrganizations/...` con los MSPs construidos. Detalle en [`../solucion-02-fabric-ca.md`](../solucion-02-fabric-ca.md).
+Reorganiza los certificados de las CAs en la estructura que Fabric espera: `network/organizations/{peer,orderer}Organizations/...` con MSPs locales del peer/orderer y del admin, más TLS de cada peer.
 
-### Paso 3 — Red, canal y unión de peers
+### Paso 4 — Red, canal y unión de peers
 
 ```bash
-# Genera el bloque génesis a partir de configtx.yaml
 bash scripts/03-start-network.sh
 ```
 
-Esto:
+Genera el bloque génesis con `configtxgen`, levanta orderer + 2 peers + 2 CouchDBs con `docker compose`, llama a `osnadmin channel join` en el orderer y hace `peer channel join` con los dos peers. Al terminar tienes el canal `signchain-channel` operativo.
 
-1. Crea el bloque génesis del canal `signchain-channel`.
-2. Levanta el orderer, los 2 peers y los 2 CouchDBs (`docker-compose-net.yaml`).
-3. Llama a `osnadmin channel join` en el orderer.
-4. Hace `peer channel join` con cada peer.
-
-Comprueba con `docker ps`:
+Comprueba que están los 8 contenedores (3 CAs + orderer + 2 peers + 2 CouchDBs):
 
 ```bash
-docker ps --format 'table {{.Names}}\t{{.Status}}' | grep -E 'orderer|peer|couchdb|ca\.'
+docker ps --format 'table {{.Names}}\t{{.Status}}' \
+  | grep -E 'orderer|peer|couchdb|ca\.'
 ```
 
-Debes ver `orderer.signchain.com`, `peer0.cliente.signchain.com`, `peer0.proveedor.signchain.com`, los dos CouchDBs y las tres CAs. Detalle en [`../solucion-03-red-y-canal.md`](../solucion-03-red-y-canal.md).
-
-### Paso 4 — Chaincode `signchain`
+### Paso 5 — Chaincode `signchain`
 
 ```bash
 bash scripts/04-deploy-chaincode.sh
 ```
 
-Recorre el lifecycle: `package` → `install` (en cada peer) → `approveformyorg` (cada org) → `checkcommitreadiness` → `commit`. La política se aplica con:
+Hace el lifecycle completo: `go mod vendor` → `package` → `install` en cada peer → `approveformyorg` por cada org → `checkcommitreadiness` → `commit` con política `AND('ClienteMSP.peer','ProveedorMSP.peer')`.
+
+### Paso 6 — App cliente (estás aquí)
 
 ```bash
---signature-policy "AND('ClienteMSP.peer','ProveedorMSP.peer')"
-```
-
-Detalle (con el código Go completo y todas las funciones) en [`../solucion-04-chaincode.md`](../solucion-04-chaincode.md).
-
-### Paso 5 — App cliente (estás aquí)
-
-```bash
-cd Modulo-2/practica/application
+cd application
 npm install
+
+# Apunta a la red del repo (no a $HOME/signchain)
+export SIGNCHAIN_NETWORK_PATH="$(cd .. && pwd)/network"
+
 npm run check        # sanity check: te dice si todo lo anterior está bien
 ```
 
-Si el sanity check sale en verde, ya puedes ejecutar el flujo end-to-end (ver sección "Uso" más abajo).
+Si el sanity check sale en verde, salta a la sección **Uso** más abajo para crear, firmar y consultar documentos.
 
 ### Resumen visual
 
 ```
-[ Paso 0 ] Docker + Node + binarios de Fabric en el PATH
+[ Paso 0 ] Docker + Node + Go + binarios de Fabric en el PATH
     |
-[ Paso 1 ] Leer el diseño
+[ Paso 1 ] git clone && cd Modulo-2/practica
     |
-[ Paso 2 ] docker compose up CAs       --> identidades + MSPs
+[ Paso 2 ] bash scripts/01-setup-cas.sh        --> 3 CAs + identidades enrolladas
     |
-[ Paso 3 ] docker compose up red       --> orderer + peers + canal
+[ Paso 3 ] bash scripts/02-build-msps.sh       --> organizations/ con MSPs
     |
-[ Paso 4 ] lifecycle del chaincode     --> signchain commiteado
+[ Paso 4 ] bash scripts/03-start-network.sh    --> red + canal + peer join
     |
-[ Paso 5 ] npm install + npm run check --> APP LISTA
+[ Paso 5 ] bash scripts/04-deploy-chaincode.sh --> signchain commiteado
+    |
+[ Paso 6 ] cd application && npm install       --> APP LISTA
+           export SIGNCHAIN_NETWORK_PATH=...
+           npm run check
 ```
 
-Si te has saltado algún paso o uno falló a medias, **`npm run check`** del paso 5 te dirá exactamente cuál — los bloques 2, 3 y 4 del sanity check se corresponden con los pasos 2, 3 y 4 de esta guía.
+Si algo falla a medias, `npm run check` del paso 6 te dirá dónde — los bloques 2, 3 y 4 del sanity check se corresponden con los pasos 3, 4 y 5 de esta guía.
+
+### Empezar de cero
+
+Si te has equivocado o quieres reiniciar:
+
+```bash
+cd Modulo-2/practica
+bash scripts/99-clean-all.sh    # baja contenedores, borra volúmenes y MSPs generados
+bash scripts/01-setup-cas.sh    # ...y vuelve a empezar
+```
 
 ---
 
@@ -146,21 +169,26 @@ Esto baja `@hyperledger/fabric-gateway` y `@grpc/grpc-js`. No genera lockfile en
 
 ## Configuración
 
-Por defecto, los scripts buscan el material criptográfico de la red en:
+La app necesita saber dónde están los certificados de la red para conectar al Gateway. Lo controla la variable **`SIGNCHAIN_NETWORK_PATH`**.
 
-```
-$HOME/signchain/network/organizations/peerOrganizations/...
+Si has seguido la guía rápida y la red vive en este mismo repo:
+
+```bash
+# Desde practica/application/
+export SIGNCHAIN_NETWORK_PATH="$(cd .. && pwd)/network"
 ```
 
-Si tu red está en otra ruta, exporta la variable de entorno **`SIGNCHAIN_NETWORK_PATH`**:
+Si tienes la red en otra ruta (p. ej. la montaste a mano siguiendo los `.md` en `$HOME/signchain`):
 
 ```bash
 # Linux / WSL / macOS
-export SIGNCHAIN_NETWORK_PATH=/ruta/absoluta/a/signchain/network
+export SIGNCHAIN_NETWORK_PATH=$HOME/signchain/network
 
 # PowerShell
 $env:SIGNCHAIN_NETWORK_PATH = "C:\ruta\a\signchain\network"
 ```
+
+Si no defines la variable, la app cae al default `$HOME/signchain/network`.
 
 La conexión usa, para cada org:
 
@@ -244,14 +272,15 @@ Resultado: OK — todo listo para ejecutar la práctica.
 | Salida | Causa probable | Cómo arreglarlo |
 |--------|----------------|-----------------|
 | `[FAIL] node_modules instalado` | No has corrido `npm install` | `npm install` |
-| `[FAIL] signcert del admin — directorio vacío` | El MSP no se construyó del todo | Repite los pasos de `solucion-02-fabric-ca.md` |
-| `[FAIL] orderer.signchain.com (localhost:7050)` | Contenedor caído o red sin levantar | `docker ps`, luego `docker compose -f network/docker/docker-compose-net.yaml up -d` |
+| `[FAIL] signcert del admin — directorio vacío` | El MSP no se construyó del todo | Re-ejecuta `bash ../scripts/01-setup-cas.sh && bash ../scripts/02-build-msps.sh` |
+| `[FAIL] orderer.signchain.com (localhost:7050)` | Contenedor caído o red sin levantar | `bash ../scripts/03-start-network.sh` (o `docker compose -f ../network/docker/docker-compose-net.yaml up -d` si la red ya está creada) |
 | `[FAIL] peer0.cliente (localhost:7051)` | Peer no arrancado o usando otro puerto | `docker logs peer0.cliente.signchain.com` |
 | `[WARN] CouchDB Cliente` | Estás usando LevelDB o el contenedor está parado | Solo es WARN: la app funciona igual |
 | `[WARN] CA Cliente` | CAs paradas tras el setup inicial | Solo es WARN: las CAs no se necesitan en runtime |
-| `[FAIL] Query GetAllDocuments — chaincode "signchain" not found` | Chaincode no commiteado | Repite `solucion-04-chaincode.md` (approve + commit) |
-| `[FAIL] Query GetAllDocuments — endorsement policy failure` | Una de las dos peers no firma (caída o MSP roto) | Verifica que las DOS peers están arriba |
+| `[FAIL] Query GetAllDocuments — chaincode "signchain" not found` | Chaincode no commiteado | `bash ../scripts/04-deploy-chaincode.sh` |
+| `[FAIL] Query GetAllDocuments — endorsement policy failure` | Una de las dos peers no firma (caída o MSP roto) | Verifica que las DOS peers están arriba con `docker ps` |
 | `[WARN] Saltando la conexión Fabric porque hay errores previos` | Hay fallos en bloques 1-3 | Arregla esos primero |
+| Todo falla y no sabes por dónde tirar | Red en estado inconsistente | `bash ../scripts/99-clean-all.sh` y vuelve a empezar desde `01-setup-cas.sh` |
 
 ## Uso
 
@@ -329,8 +358,17 @@ La política es `AND(Cliente, Proveedor)`. Las dos peers tienen que estar arriba
 
 ## Limpieza
 
+Solo dependencias de Node:
+
 ```bash
 rm -rf node_modules package-lock.json
 ```
 
-El estado on-chain se reinicia parando la red y borrando volúmenes (ver `solucion-03-red-y-canal.md`, sección de limpieza).
+Tear-down completo (red + MSPs + estado on-chain):
+
+```bash
+cd ..                          # a practica/
+bash scripts/99-clean-all.sh
+```
+
+Esto baja todos los contenedores (CAs y red), borra volúmenes Docker, MSPs construidos, bloque génesis y vendor del chaincode. La estructura del repo queda intacta y puedes volver a empezar con `bash scripts/01-setup-cas.sh`.
