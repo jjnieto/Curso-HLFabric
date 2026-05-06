@@ -70,9 +70,10 @@ geth.exe --datadir mychaindata ^
          --http.api "eth,net,web3,personal,admin,miner" ^
          --http.corsdomain "*" ^
          --allow-insecure-unlock ^
-         --nodiscover ^
          console
 ```
+
+> **Sobre `--nodiscover`**: en versiones de la práctica donde queremos aislamiento total se añade ese flag para desactivar el descubrimiento automático. Aquí lo dejamos fuera: con `--networkid 12345` no hay riesgo de conectarse a nadie de Internet (no hay nadie con ese networkid en redes públicas), y mantenerlo activo nos permitirá usar `--bootnodes` en la Parte 3 para que los alumnos se descubran entre sí.
 
 > En PowerShell el carácter de continuación de línea es el backtick `` ` `` en lugar de `^`. En Linux/WSL es `\`.
 
@@ -100,7 +101,6 @@ at block: 0 (Mon May 06 2026 ...)
 | `--http.api "eth,net,web3,personal,admin,miner"` | Qué módulos se exponen por RPC. `admin` es necesario para añadir peers en remoto. |
 | `--http.corsdomain "*"` | Acepta llamadas RPC desde cualquier origen (entornos de aprendizaje). |
 | `--allow-insecure-unlock` | Permite `personal.unlockAccount` por RPC. **Solo para redes privadas**, jamás en mainnet. |
-| `--nodiscover` | Desactiva el descubrimiento automático de peers. Aquí lo haremos a mano para no acabar conectándonos a nodos desconocidos. |
 | `console` | Abre la REPL JS al final. Sin esto, geth corre como demonio. |
 
 **Pregunta**: ¿qué pasa si pones un `networkid` distinto al `chainId` del `genesis.json`?
@@ -111,74 +111,112 @@ at block: 0 (Mon May 06 2026 ...)
 
 ## Parte 3 — Conectar tu nodo a otros (formar red P2P)
 
-Cada nodo está aislado por defecto. Hay dos formas de conectarlos: en caliente (`admin.addPeer`) o al arrancar (`--bootnodes`).
+Para esta parte necesitamos definir **dos roles** en clase:
 
-### Ejercicio 3.1 — Saca tu enode URL
+- **Host** (1 alumno): el primero que arranca. Su nodo será el bootnode al que se conectan los demás. Va a publicar su enode URL para que el resto la copie.
+- **Joiners** (resto de alumnos): arrancan después y se conectan al host con `--bootnodes`. Una vez dentro, se descubren entre sí automáticamente.
 
-En la consola JavaScript de tu nodo, escribe:
+### Ejercicio 3.1 — (HOST) Componer tu enode URL "publicable"
+
+Hay dos piezas:
+
+**(a) Saca tu nodeID + puerto** desde la consola JS de tu geth:
 
 ```javascript
 > admin.nodeInfo.enode
-"enode://abc123def456...7890@192.168.1.42:30303?discport=0"
+"enode://abc123def456...7890@127.0.0.1:30303?discport=0"
 ```
 
-Esa cadena es tu **identidad pública en la red P2P**. La parte de antes del `@` es tu nodeID (deriva de tu clave pública). La parte de después es tu IP + puerto P2P.
+Casi seguro Geth te devuelve `127.0.0.1` (loopback). Eso **no sirve** a tus compañeros — desde fuera de tu máquina, `127.0.0.1` apunta al ordenador del que pregunta, no al tuyo.
 
-Apúntala. Vas a compartirla con los compañeros.
+**(b) Mira tu IP local en la red del aula** (la que comparten todos los alumnos). En otra terminal:
 
-### Ejercicio 3.2 — Añadir un peer (modo caliente)
-
-Tu compañero, en SU consola, ejecuta lo siguiente con TU enode:
-
-```javascript
-> admin.addPeer("enode://abc123def456...7890@192.168.1.42:30303")
-true
+```bat
+:: Windows
+ipconfig
 ```
 
-Si todo va bien, `true`. Si te devuelve `false`, normalmente es porque ya estaba o porque la enode tiene algún error de copia.
+Busca la línea que empieza por `Dirección IPv4` o `IPv4 Address` en tu adaptador activo (Wi-Fi o Ethernet). Será algo como `192.168.1.42` o `10.0.0.15`.
+
+> Linux/WSL: `hostname -I` o `ip a | grep inet`. **Atención**: si trabajas dentro de WSL2, la IP de WSL no es la del host Windows. Lo más fiable en clase es lanzar `geth.exe` directamente en Windows (no en WSL) para que la IP coincida con la que ven los demás.
+
+**(c) Compón tu enode publicable** sustituyendo `127.0.0.1` por tu IP real, y opcionalmente quita el sufijo `?discport=0`:
+
+```
+enode://abc123def456...7890@192.168.1.42:30303
+```
+
+Esto es lo que escribes en la pizarra para que el resto te use como bootnode.
+
+**(d) Asegúrate de que el firewall permite entrada en 30303**. En Windows, en una terminal con permisos de administrador:
+
+```bat
+netsh advfirewall firewall add rule name="Geth P2P TCP" dir=in action=allow protocol=TCP localport=30303
+netsh advfirewall firewall add rule name="Geth P2P UDP" dir=in action=allow protocol=UDP localport=30303
+```
+
+Geth usa **TCP** para datos (bloques, transacciones) y **UDP** para discovery. Sin esas reglas, los joiners verán `false` al intentar conectar.
+
+### Ejercicio 3.2 — (JOINERS) Arrancar conectándose al bootnode
+
+Pega la enode publicada por el host como `--bootnodes` al arrancar tu nodo:
+
+```bat
+geth.exe --datadir mychaindata ^
+         --networkid 12345 ^
+         --port 30303 ^
+         --bootnodes "enode://abc123def456...7890@192.168.1.42:30303" ^
+         --http --http.addr 0.0.0.0 --http.port 8545 ^
+         --http.api "eth,net,web3,personal,admin,miner" ^
+         --http.corsdomain "*" ^
+         --allow-insecure-unlock ^
+         console
+```
+
+> **Si estáis varios alumnos en la misma máquina** (raro en aula, frecuente en pruebas en casa): cada uno necesita un `--datadir` y un `--port` distintos (`30304`, `30305`...). Si estáis en máquinas distintas, podéis usar el mismo `30303` sin conflictos.
+
+Geth se conecta al host al arrancar y aprende de él al resto de joiners conforme van llegando. Es exactamente cómo funciona Bitcoin con sus DNS-seeds y bootnodes oficiales.
 
 ### Ejercicio 3.3 — Verifica que estáis conectados
 
-En cualquiera de los dos nodos:
+En cualquier nodo (host o joiner), en su consola JS:
 
 ```javascript
 > net.peerCount
-1
+3                    // host con 3 joiners conectados, por ejemplo
 
 > admin.peers
 [{
-    enode: "enode://abc123...",
+    enode: "enode://...",
     name: "Geth/v1.11.6-stable-ea9e62ca/windows-386/go1.20.3",
     network: {
       localAddress: "192.168.1.42:30303",
       remoteAddress: "192.168.1.99:50402"
     },
     protocols: { eth: { version: 66, head: "0x...", difficulty: 1 } }
-}]
+}, ...]
 ```
 
-`peerCount` debe ser `1` en cada nodo (el otro). Si tienes varios alumnos en clase, será `N-1`.
+Si tienes 4 nodos en clase (1 host + 3 joiners), todos deberían acabar con `peerCount = 3`. La red completa: cada nodo conoce a todos los demás.
 
-**Pregunta**: ¿hace falta que los DOS hagan `admin.addPeer`, o basta con que uno solo lo haga?
+**Pregunta**: si Joiner_A se conecta al host y Joiner_B también se conecta al host, ¿quién le dice a Joiner_A que existe Joiner_B?
 
-> Basta con uno solo. Cuando el peer A añade al peer B, el handshake es bidireccional: B aprende sobre A automáticamente. El otro lo verá en su `admin.peers` aunque nunca haya hecho `addPeer`.
+> El propio host. En cuanto Joiner_B se conecta, el host le pasa a Joiner_A la enode de Joiner_B (gossip de peers). Joiner_A intenta entonces conectar directamente con Joiner_B. Tras unos segundos, todos los nodos se conocen entre todos sin haber tenido que hacer `admin.addPeer` ni una sola vez.
 
-### Ejercicio 3.4 — Alternativa: pasar bootnodes al arrancar
+### Ejercicio 3.4 — Alternativa: añadir peers en caliente
 
-En lugar de añadir peers en caliente, puedes pasarlos al arrancar:
+Si el host arrancó después que tú, o si quieres añadir un peer una vez ya estás corriendo, también vale el modo caliente:
 
-```bat
-geth.exe --datadir mychaindata --networkid 12345 ^
-         --port 30303 ^
-         --bootnodes "enode://abc123...@192.168.1.42:30303" ^
-         console
+```javascript
+> admin.addPeer("enode://abc123def456...7890@192.168.1.42:30303")
+true
 ```
 
-Geth se conecta automáticamente al bootnode al arrancar y a partir de ahí descubre el resto de la red.
+Devuelve `true` si la solicitud se ha registrado (no garantiza que la conexión TCP haya tenido éxito — eso lo confirmas con `admin.peers` segundos después). `false` suele indicar un error de formato en la enode.
 
-**Pregunta**: ¿qué ventaja tiene `--bootnodes` frente a `admin.addPeer` cuando arrancas un nodo nuevo?
+**Pregunta**: ¿cuándo es preferible `--bootnodes` y cuándo `admin.addPeer`?
 
-> Que el peer ya está conectado **antes** de que abras la consola. Si arrancas con `admin.addPeer`, durante los primeros segundos tu nodo está aislado. Con bootnodes, está conectado desde el segundo cero. En redes reales (Bitcoin, Ethereum mainnet) los bootnodes son los puntos de entrada estándar.
+> `--bootnodes` cuando sabes el peer al que quieres conectar **antes** de arrancar (caso típico: el host ya está corriendo, los joiners arrancan después). Te ahorras estar conectado a "nadie" durante los primeros segundos. `admin.addPeer` es mejor cuando descubres un peer nuevo en caliente, sin reiniciar tu nodo. En la práctica de aula los joiners usan bootnodes y solo recurrimos a `admin.addPeer` si alguno arranca antes que el host.
 
 ---
 
@@ -229,6 +267,9 @@ El bloque que minó UN alumno aparece en TODOS los demás. Eso es el **gossip de
 | `Error: account is locked` al hacer transacciones | La cuenta no está desbloqueada | `personal.unlockAccount(eth.accounts[0])` y la passphrase |
 | `admin is not defined` en la consola | El módulo `admin` no está habilitado | Añade `admin` a `--http.api` o reinicia con la consola IPC en lugar de RPC |
 | `peerCount` se queda en 0 tras `addPeer` | IP / puerto mal, o el otro nodo no escucha | `telnet <ip> 30303` para verificar; comprueba firewall de Windows |
+| Mi enode dice `127.0.0.1`, los compañeros no se conectan | Geth solo conoce la IP de loopback hasta que recibe conexiones | Sustituye `127.0.0.1` por tu IP real (`ipconfig`) antes de publicar la enode |
+| Los compañeros dicen "addPeer true" pero no se conecta nada | Firewall de Windows bloquea entradas TCP/UDP en 30303 | `netsh advfirewall firewall add rule name="Geth P2P TCP" dir=in action=allow protocol=TCP localport=30303` (y lo mismo para UDP) en una terminal admin |
+| WSL: la IP que veo en `hostname -I` no es la que ven los compañeros | WSL2 corre con su propia interfaz virtual | Lanza `geth.exe` directamente en Windows, no dentro de WSL |
 | `chain id mismatch` al añadir peer | `networkid` o `chainId` distintos | Asegúrate de que ambos arrancan con el MISMO `genesis.json` y el mismo `--networkid` |
 | `miner.start(1)` no produce bloques | Si usas Clique, tu cuenta no es signer; si usas Ethash, la dificultad puede ser muy alta | Revisa `extraData` en `genesis.json`; prueba con `miner.start()` sin argumento |
 | Cierras geth y al reabrir tarda mucho | Está re-validando la cadena tras un cierre sucio | Cierra siempre con `> exit` desde la consola, no con Ctrl+C |
