@@ -76,7 +76,83 @@ mychaindata/
 
 ---
 
-## Parte 2 — Arrancar el nodo
+## Parte 2 — Crear una cuenta
+
+Una cuenta de Ethereum es un par clave privada / dirección. Vas a necesitarla para:
+
+- Recibir las recompensas si tu nodo mina (etherbase).
+- Firmar transacciones desde tu nodo.
+- Ser el signer en redes Clique (si tu `genesis.json` te tiene listado).
+
+> **Importante**: hay que crear la cuenta **antes** de arrancar el nodo. La forma fiable y portable es el subcomando `account new` de Geth (no la consola JS — el namespace `personal` está deprecado en 1.11.x y a veces no carga).
+
+### Ejercicio 2.1 — Crear la cuenta
+
+```bat
+:: cmd (Windows)
+geth.exe --datadir mychaindata account new
+```
+
+```powershell
+# PowerShell (Windows)
+.\geth.exe --datadir mychaindata account new
+```
+
+```bash
+# bash (Linux / WSL / macOS)
+./geth --datadir mychaindata account new
+```
+
+Geth te pedirá una passphrase (dos veces) y devolverá algo como:
+
+```
+Your new key was generated
+
+Public address of the key:   0x9d3a7b8e2c4f1d6a0b9c8d7e6f5a4b3c2d1e0f9a
+Path of the secret key file: mychaindata\keystore\UTC--2026-05-07T08-30-00.000Z--9d3a7b...
+
+- You can share your public address with anyone. Others need it to interact with you.
+- You must NEVER share the secret key with anyone! The key controls access to your funds!
+- You must BACKUP your key file! Without the key, it's impossible to access account funds!
+- You must REMEMBER your password! Without the password, it's impossible to decrypt the key!
+```
+
+**Apunta tu dirección pública (la que empieza por `0x...`)**. La vas a necesitar en la Parte 5 para configurar el etherbase.
+
+> La passphrase no la usaremos en clase salvo si haces transacciones desde el nodo. Aun así, **apúntala** — sin ella el archivo de clave es papel mojado.
+
+### Ejercicio 2.2 — Verificar que la cuenta existe
+
+Antes de arrancar el nodo, comprueba que la lista de cuentas no está vacía:
+
+```bat
+:: cmd (Windows)
+geth.exe --datadir mychaindata account list
+```
+
+```powershell
+# PowerShell (Windows)
+.\geth.exe --datadir mychaindata account list
+```
+
+```bash
+# bash (Linux / WSL / macOS)
+./geth --datadir mychaindata account list
+```
+
+Salida esperada:
+
+```
+Account #0: {9d3a7b8e2c4f1d6a0b9c8d7e6f5a4b3c2d1e0f9a} keystore://...
+```
+
+Si te aparece, perfecto. Si la lista está vacía, repite el `account new`.
+
+> Las claves se guardan en `mychaindata/keystore/` cifradas con la passphrase. Cada llamada a `account new` añade una clave más al keystore. Lo normal en una práctica es tener una sola.
+
+---
+
+## Parte 3 — Arrancar el nodo
 
 ### Ejercicio 2.1 — Arranque con consola JavaScript
 
@@ -118,7 +194,7 @@ geth.exe --datadir mychaindata ^
 
 > En **PowerShell** el backtick (`` ` ``) tiene que ser el **último carácter de la línea**, sin espacio detrás. Si copias el bloque y la línea no continúa, suele ser un espacio extra invisible.
 
-> **Sobre `--nodiscover`**: en versiones de la práctica donde queremos aislamiento total se añade ese flag para desactivar el descubrimiento automático. Aquí lo dejamos fuera: con `--networkid 12345` no hay riesgo de conectarse a nadie de Internet (no hay nadie con ese networkid en redes públicas), y mantenerlo activo nos permitirá usar `--bootnodes` en la Parte 3 para que los alumnos se descubran entre sí.
+> **Sobre `--nodiscover`**: en versiones de la práctica donde queremos aislamiento total se añade ese flag para desactivar el descubrimiento automático. Aquí lo dejamos fuera: con `--networkid 12345` no hay riesgo de conectarse a nadie de Internet (no hay nadie con ese networkid en redes públicas), y mantenerlo activo nos permitirá usar `--bootnodes` en la Parte 4 para que los alumnos se descubran entre sí.
 
 Cuando arranque, te queda una **REPL JavaScript** donde puedes escribir comandos contra el nodo:
 
@@ -152,7 +228,7 @@ at block: 0 (Mon May 06 2026 ...)
 
 ---
 
-## Parte 3 — Conectar tu nodo a otros (formar red P2P)
+## Parte 4 — Conectar tu nodo a otros (formar red P2P)
 
 Para esta parte necesitamos definir **dos roles** en clase:
 
@@ -318,21 +394,108 @@ Devuelve `true` si la solicitud se ha registrado (no garantiza que la conexión 
 
 ---
 
-## Parte 4 — Demo: el primer bloque propagado
+## Parte 5 — Iniciar el minado
 
-Esto es lo que mejor demuestra que la red P2P "está viva".
+Hasta ahora tu nodo está conectado y al día, pero no produce bloques. Sin un nodo minando, la cadena se queda parada en el bloque 0 (génesis) y las transacciones se acumulan en el mempool sin confirmar. En la práctica de aula, lo natural es que **un alumno** (típicamente el host) sea el que mine, y los demás solo reciban los bloques.
 
-1. Cada alumno arranca su nodo (`init` + arranque, partes 1 y 2).
-2. Uno publica su enode en la pizarra.
-3. Los demás hacen `admin.addPeer("enode://...")`.
-4. Verificáis que `net.peerCount` ha subido en todos.
-5. Un alumno arranca el minado en su nodo:
+### Ejercicio 5.1 — Configurar el etherbase y arrancar el minado
+
+En la consola JS del nodo que vaya a minar:
+
+```javascript
+// 1. Confirma que tu cuenta está cargada (la creaste en la Parte 2)
+> eth.accounts
+["0x9d3a7b8e2c4f1d6a0b9c8d7e6f5a4b3c2d1e0f9a"]
+
+// 2. Configura esa cuenta como etherbase (destino de las recompensas)
+> miner.setEtherbase(eth.accounts[0])
+true
+
+// 3. Verifica
+> eth.coinbase
+"0x9d3a7b8e2c4f1d6a0b9c8d7e6f5a4b3c2d1e0f9a"
+
+// 4. Lanza el minado con 1 thread
+> miner.start(1)
+null
+```
+
+> El `null` que devuelve `miner.start(1)` no es error. En Geth las llamadas que no devuelven valor explícito retornan `null`. Si fallara verías un mensaje rojo (`ERROR ... Cannot start mining ...`).
+
+A los pocos segundos verás logs en la consola tipo:
+
+```
+INFO [05-07|...] Commit new sealing work
+INFO [05-07|...] 🔨 mined potential block        number=1 hash=0xabc...
+INFO [05-07|...] Successfully sealed new block   number=1 hash=0xabc...
+```
+
+Y la cadena empieza a avanzar:
+
+```javascript
+> eth.blockNumber
+3
+
+> eth.getBlock("latest")
+{ number: 3, miner: "0x9d3a7b...", ... }
+```
+
+Para parar:
+
+```javascript
+> miner.stop()
+true
+```
+
+### Ejercicio 5.2 — Atajo: arrancar el nodo ya minando
+
+Para no repetir los pasos de configuración cada vez que arranques, puedes pasar al comando de la Parte 3 estos flags adicionales:
+
+```
+--miner.etherbase 0x9d3a7b8e2c4f1d6a0b9c8d7e6f5a4b3c2d1e0f9a --mine
+```
+
+Si además quieres que la cuenta esté desbloqueada (para firmar transacciones automáticamente):
+
+```
+--unlock 0x9d3a7b8e2c4f1d6a0b9c8d7e6f5a4b3c2d1e0f9a --password password.txt --allow-insecure-unlock
+```
+
+Donde `password.txt` es un archivo que contiene tu passphrase en texto plano. **Solo en redes privadas de práctica**. En producción, las claves jamás se desbloquean por archivo.
+
+### Ejercicio 5.3 — Si tu genesis usa Clique (PoA), ojo
+
+En **Clique** (Proof of Authority) solo los signers definidos en el campo `extraData` del `genesis.json` pueden producir bloques. Si tu cuenta nueva no es signer, llamar a `miner.start()` no producirá nada. Para verificarlo:
+
+```javascript
+> clique.getSigners()
+["0xf1e0d9c8b7a6...", "0x12345abcde..."]
+```
+
+Si tu dirección no aparece ahí:
+
+- **Opción A**: usa la cuenta del signer original (la que generó el `genesis.json`). Si la passphrase está apuntada en el material de la práctica, perfecto.
+- **Opción B**: regenera el `genesis.json` poniendo tu nueva dirección en `extraData` (cambia el bloque 0 → todos los nodos tienen que volver a hacer `init` con limpieza previa).
+
+En **Ethash** (PoW) cualquier nodo puede minar siempre que la `difficulty` del genesis sea baja (`"difficulty": "0x1"` o similar para una práctica).
+
+---
+
+## Parte 6 — Demo: el primer bloque propagado
+
+Esto es lo que mejor demuestra que la red P2P "está viva". Llegados a este punto cada alumno tiene su nodo arrancado, su cuenta creada y al menos uno tiene el etherbase configurado.
+
+1. Cada alumno tiene su nodo en marcha (Partes 1 a 4 hechas).
+2. Uno publica su enode en la pizarra y los demás hacen `admin.addPeer(...)` o arrancan con `--bootnodes`.
+3. Verificáis que `net.peerCount` ha subido en todos.
+4. El alumno con etherbase configurado (Parte 5) lanza el minado:
    ```javascript
    > miner.start(1)
-   > // ...esperar 10-20 segundos...
+   null
+   > // ...esperar 10-20 segundos, mirar logs sealing...
    > miner.stop()
    ```
-6. **Sin haber hecho nada**, el resto de los alumnos hacen:
+5. **Sin haber hecho nada**, el resto de los alumnos hacen:
    ```javascript
    > eth.blockNumber
    3   // o el número que sea, pero > 0
@@ -366,7 +529,7 @@ El bloque que minó UN alumno aparece en TODOS los demás. Eso es el **gossip de
 | `admin is not defined` en la consola | El módulo `admin` no está habilitado | Añade `admin` a `--http.api` o reinicia con la consola IPC en lugar de RPC |
 | `peerCount` se queda en 0 tras `addPeer` | IP / puerto mal, o el otro nodo no escucha | `telnet <ip> 30303` para verificar; comprueba firewall de Windows |
 | Mi enode dice `127.0.0.1`, los compañeros no se conectan | Geth solo conoce la IP de loopback hasta que recibe conexiones | Sustituye `127.0.0.1` por tu IP real (`ipconfig`) antes de publicar la enode |
-| Los compañeros dicen "addPeer true" pero no se conecta nada | Firewall bloquea entradas TCP/UDP en 30303 | Abre TCP+UDP 30303 (ver Parte 3.1.d): `netsh` en cmd, `New-NetFirewallRule` en PowerShell, `ufw allow 30303` en Linux |
+| Los compañeros dicen "addPeer true" pero no se conecta nada | Firewall bloquea entradas TCP/UDP en 30303 | Abre TCP+UDP 30303 (ver Parte 4.1.d): `netsh` en cmd, `New-NetFirewallRule` en PowerShell, `ufw allow 30303` en Linux |
 | WSL: la IP que veo en `hostname -I` no es la que ven los compañeros | WSL2 corre con su propia interfaz virtual | Lanza `geth.exe` directamente en Windows, no dentro de WSL |
 | `chain id mismatch` al añadir peer | `networkid` o `chainId` distintos | Asegúrate de que ambos arrancan con el MISMO `genesis.json` y el mismo `--networkid` |
 | `miner.start(1)` no produce bloques | Si usas Clique, tu cuenta no es signer; si usas Ethash, la dificultad puede ser muy alta | Revisa `extraData` en `genesis.json`; prueba con `miner.start()` sin argumento |
