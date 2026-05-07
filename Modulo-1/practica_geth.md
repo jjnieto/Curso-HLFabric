@@ -4,9 +4,16 @@
 
 ## Herramientas que vas a usar
 
-- **Geth** (Go Ethereum) 1.11.6 para Windows 386 — `geth-windows-386-1.11.6-ea9e62ca.exe`. En lo que sigue lo llamamos `geth.exe`.
+- **Geth** (Go Ethereum) 1.11.6 — el binario depende de tu sistema:
+    - Windows: `geth-windows-386-1.11.6-ea9e62ca.exe` (lo llamaremos `geth.exe`).
+    - Linux / macOS: `geth` (sin extensión, el ejecutable de tu paquete o release).
 - Un archivo **`genesis.json`** ya preparado, dentro de la carpeta `mychaindata/`. Define el bloque cero, el `chainId`, los validadores iniciales si usas Clique, etc.
-- Una terminal de Windows (`cmd` o PowerShell). Si usas WSL/Linux, los comandos son idénticos cambiando `geth.exe` por `geth` y los `^` finales por `\`.
+- Una terminal a tu elección: **cmd** o **PowerShell** en Windows, **bash/zsh** en Linux/WSL/macOS. Cada bloque de comandos largo de esta práctica trae las tres versiones; usa la que toque.
+
+> **Diferencias clave entre shells**:
+> - Continuación de línea: `^` en cmd, backtick `` ` `` en PowerShell, `\` en bash.
+> - Separador de rutas: `\` en Windows (cmd y PowerShell aceptan `/` también), `/` en Linux.
+> - Binario: `geth.exe` en Windows, `./geth` en Linux/macOS si está en el directorio actual, o solo `geth` si está en el `PATH`.
 
 ## Conceptos clave
 
@@ -28,7 +35,18 @@
 Antes de arrancar el nodo hay que crear las estructuras internas a partir del bloque génesis. Esto se hace **una sola vez** por cada `--datadir`.
 
 ```bat
+:: cmd (Windows)
 geth.exe --datadir mychaindata init mychaindata\genesis.json
+```
+
+```powershell
+# PowerShell (Windows)
+.\geth.exe --datadir mychaindata init mychaindata\genesis.json
+```
+
+```bash
+# bash (Linux / WSL / macOS)
+./geth --datadir mychaindata init mychaindata/genesis.json
 ```
 
 Salida esperada (algo así):
@@ -63,6 +81,7 @@ mychaindata/
 ### Ejercicio 2.1 — Arranque con consola JavaScript
 
 ```bat
+:: cmd (Windows)
 geth.exe --datadir mychaindata ^
          --networkid 12345 ^
          --port 30303 ^
@@ -73,9 +92,33 @@ geth.exe --datadir mychaindata ^
          console
 ```
 
-> **Sobre `--nodiscover`**: en versiones de la práctica donde queremos aislamiento total se añade ese flag para desactivar el descubrimiento automático. Aquí lo dejamos fuera: con `--networkid 12345` no hay riesgo de conectarse a nadie de Internet (no hay nadie con ese networkid en redes públicas), y mantenerlo activo nos permitirá usar `--bootnodes` en la Parte 3 para que los alumnos se descubran entre sí.
+```powershell
+# PowerShell (Windows)
+.\geth.exe --datadir mychaindata `
+           --networkid 12345 `
+           --port 30303 `
+           --http --http.addr 0.0.0.0 --http.port 8545 `
+           --http.api "eth,net,web3,personal,admin,miner" `
+           --http.corsdomain "*" `
+           --allow-insecure-unlock `
+           console
+```
 
-> En PowerShell el carácter de continuación de línea es el backtick `` ` `` en lugar de `^`. En Linux/WSL es `\`.
+```bash
+# bash (Linux / WSL / macOS)
+./geth --datadir mychaindata \
+       --networkid 12345 \
+       --port 30303 \
+       --http --http.addr 0.0.0.0 --http.port 8545 \
+       --http.api "eth,net,web3,personal,admin,miner" \
+       --http.corsdomain "*" \
+       --allow-insecure-unlock \
+       console
+```
+
+> En **PowerShell** el backtick (`` ` ``) tiene que ser el **último carácter de la línea**, sin espacio detrás. Si copias el bloque y la línea no continúa, suele ser un espacio extra invisible.
+
+> **Sobre `--nodiscover`**: en versiones de la práctica donde queremos aislamiento total se añade ese flag para desactivar el descubrimiento automático. Aquí lo dejamos fuera: con `--networkid 12345` no hay riesgo de conectarse a nadie de Internet (no hay nadie con ese networkid en redes públicas), y mantenerlo activo nos permitirá usar `--bootnodes` en la Parte 3 para que los alumnos se descubran entre sí.
 
 Cuando arranque, te queda una **REPL JavaScript** donde puedes escribir comandos contra el nodo:
 
@@ -132,13 +175,24 @@ Casi seguro Geth te devuelve `127.0.0.1` (loopback). Eso **no sirve** a tus comp
 **(b) Mira tu IP local en la red del aula** (la que comparten todos los alumnos). En otra terminal:
 
 ```bat
-:: Windows
+:: cmd (Windows)
 ipconfig
 ```
 
-Busca la línea que empieza por `Dirección IPv4` o `IPv4 Address` en tu adaptador activo (Wi-Fi o Ethernet). Será algo como `192.168.1.42` o `10.0.0.15`.
+```powershell
+# PowerShell (Windows) — filtra solo IPv4 de tarjetas activas
+Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -eq 'Dhcp' -or $_.PrefixOrigin -eq 'Manual' } | Select-Object IPAddress, InterfaceAlias
+```
 
-> Linux/WSL: `hostname -I` o `ip a | grep inet`. **Atención**: si trabajas dentro de WSL2, la IP de WSL no es la del host Windows. Lo más fiable en clase es lanzar `geth.exe` directamente en Windows (no en WSL) para que la IP coincida con la que ven los demás.
+```bash
+# bash (Linux / WSL / macOS)
+hostname -I              # rápida, lista todas
+ip -4 -o addr show       # detallada, una línea por interfaz
+```
+
+Busca la IP de tu adaptador activo (Wi-Fi o Ethernet, según el caso). Será algo como `192.168.1.42` o `10.0.0.15`. Descarta `127.0.0.1` (loopback) y las direcciones tipo `169.254.x.x` (link-local sin DHCP).
+
+> **Atención con WSL2**: si trabajas dentro de WSL2, `hostname -I` te devuelve la IP de la interfaz virtual de WSL, **no** la IP del host Windows en la red del aula. Soluciones: (1) lanza `geth.exe` directamente en Windows (cmd o PowerShell) para que coincida con la IP que ven tus compañeros, o (2) si insistes en WSL, usa la IP de Windows (la que da `ipconfig` en cmd) y configura port-forwarding con `netsh interface portproxy`.
 
 **(c) Compón tu enode publicable** sustituyendo `127.0.0.1` por tu IP real, y opcionalmente quita el sufijo `?discport=0`:
 
@@ -148,20 +202,38 @@ enode://abc123def456...7890@192.168.1.42:30303
 
 Esto es lo que escribes en la pizarra para que el resto te use como bootnode.
 
-**(d) Asegúrate de que el firewall permite entrada en 30303**. En Windows, en una terminal con permisos de administrador:
+**(d) Asegúrate de que el firewall permite entrada en 30303**. Geth usa **TCP** para datos (bloques, transacciones) y **UDP** para discovery. Si no abres ambos, los joiners verán `false` al intentar conectar.
 
 ```bat
+:: cmd (Windows, terminal como Administrador)
 netsh advfirewall firewall add rule name="Geth P2P TCP" dir=in action=allow protocol=TCP localport=30303
 netsh advfirewall firewall add rule name="Geth P2P UDP" dir=in action=allow protocol=UDP localport=30303
 ```
 
-Geth usa **TCP** para datos (bloques, transacciones) y **UDP** para discovery. Sin esas reglas, los joiners verán `false` al intentar conectar.
+```powershell
+# PowerShell (Windows, sesión como Administrador)
+New-NetFirewallRule -DisplayName "Geth P2P TCP" -Direction Inbound -Protocol TCP -LocalPort 30303 -Action Allow
+New-NetFirewallRule -DisplayName "Geth P2P UDP" -Direction Inbound -Protocol UDP -LocalPort 30303 -Action Allow
+```
+
+```bash
+# bash (Linux con ufw — más simple)
+sudo ufw allow 30303/tcp
+sudo ufw allow 30303/udp
+
+# bash (Linux con iptables — alternativa)
+sudo iptables -A INPUT -p tcp --dport 30303 -j ACCEPT
+sudo iptables -A INPUT -p udp --dport 30303 -j ACCEPT
+```
+
+> En macOS el firewall por defecto es por aplicación, no por puerto: la primera vez que `geth` intente escuchar en 30303 macOS preguntará si lo permites. Acepta y listo.
 
 ### Ejercicio 3.2 — (JOINERS) Arrancar conectándose al bootnode
 
 Pega la enode publicada por el host como `--bootnodes` al arrancar tu nodo:
 
 ```bat
+:: cmd (Windows)
 geth.exe --datadir mychaindata ^
          --networkid 12345 ^
          --port 30303 ^
@@ -171,6 +243,32 @@ geth.exe --datadir mychaindata ^
          --http.corsdomain "*" ^
          --allow-insecure-unlock ^
          console
+```
+
+```powershell
+# PowerShell (Windows)
+.\geth.exe --datadir mychaindata `
+           --networkid 12345 `
+           --port 30303 `
+           --bootnodes "enode://abc123def456...7890@192.168.1.42:30303" `
+           --http --http.addr 0.0.0.0 --http.port 8545 `
+           --http.api "eth,net,web3,personal,admin,miner" `
+           --http.corsdomain "*" `
+           --allow-insecure-unlock `
+           console
+```
+
+```bash
+# bash (Linux / WSL / macOS)
+./geth --datadir mychaindata \
+       --networkid 12345 \
+       --port 30303 \
+       --bootnodes "enode://abc123def456...7890@192.168.1.42:30303" \
+       --http --http.addr 0.0.0.0 --http.port 8545 \
+       --http.api "eth,net,web3,personal,admin,miner" \
+       --http.corsdomain "*" \
+       --allow-insecure-unlock \
+       console
 ```
 
 > **Si estáis varios alumnos en la misma máquina** (raro en aula, frecuente en pruebas en casa): cada uno necesita un `--datadir` y un `--port` distintos (`30304`, `30305`...). Si estáis en máquinas distintas, podéis usar el mismo `30303` sin conflictos.
@@ -268,7 +366,7 @@ El bloque que minó UN alumno aparece en TODOS los demás. Eso es el **gossip de
 | `admin is not defined` en la consola | El módulo `admin` no está habilitado | Añade `admin` a `--http.api` o reinicia con la consola IPC en lugar de RPC |
 | `peerCount` se queda en 0 tras `addPeer` | IP / puerto mal, o el otro nodo no escucha | `telnet <ip> 30303` para verificar; comprueba firewall de Windows |
 | Mi enode dice `127.0.0.1`, los compañeros no se conectan | Geth solo conoce la IP de loopback hasta que recibe conexiones | Sustituye `127.0.0.1` por tu IP real (`ipconfig`) antes de publicar la enode |
-| Los compañeros dicen "addPeer true" pero no se conecta nada | Firewall de Windows bloquea entradas TCP/UDP en 30303 | `netsh advfirewall firewall add rule name="Geth P2P TCP" dir=in action=allow protocol=TCP localport=30303` (y lo mismo para UDP) en una terminal admin |
+| Los compañeros dicen "addPeer true" pero no se conecta nada | Firewall bloquea entradas TCP/UDP en 30303 | Abre TCP+UDP 30303 (ver Parte 3.1.d): `netsh` en cmd, `New-NetFirewallRule` en PowerShell, `ufw allow 30303` en Linux |
 | WSL: la IP que veo en `hostname -I` no es la que ven los compañeros | WSL2 corre con su propia interfaz virtual | Lanza `geth.exe` directamente en Windows, no dentro de WSL |
 | `chain id mismatch` al añadir peer | `networkid` o `chainId` distintos | Asegúrate de que ambos arrancan con el MISMO `genesis.json` y el mismo `--networkid` |
 | `miner.start(1)` no produce bloques | Si usas Clique, tu cuenta no es signer; si usas Ethash, la dificultad puede ser muy alta | Revisa `extraData` en `genesis.json`; prueba con `miner.start()` sin argumento |
