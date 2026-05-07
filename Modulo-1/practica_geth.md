@@ -28,7 +28,25 @@
 
 ---
 
+## Estructura de la práctica
+
+La práctica se hace en **tres fases** cronológicas. Saber en qué fase estás te ayuda a seguir el ritmo de la clase y a entender qué Partes ejecuta cada uno.
+
+| Fase | Quién | Qué se hace | Partes implicadas |
+|------|-------|-------------|--------------------|
+| **A — Demo** | Solo el profesor | Recorre las Partes 1, 2, 3 y 5 con la pantalla compartida. Al final tiene su nodo arrancado, su cuenta creada y minando bloques. Los alumnos miran. | 1, 2, 3, 5 |
+| **B — Replicación local** | Cada alumno en su máquina | Repite Partes 1, 2 y 3. Termina con un nodo aislado, con bloque 0, sin red común todavía. | 1, 2, 3 |
+| **C — Red común** | Cada alumno se conecta al nodo del profesor | Aplica la Parte 4 con `--bootnodes` apuntando al profesor. Sincroniza la cadena del profesor (incluyendo todos los bloques que se han minado en la Fase A). | 4 |
+
+Cada Parte indica al inicio en qué fase encaja.
+
+> **¿Y los alumnos no minan?** En esta práctica no. El `genesis.json` está configurado con Clique (PoA) y el único signer es el profesor. Los alumnos pueden llamar a `miner.start()` pero no producirán bloques. Eso refuerza la idea de que en una blockchain permisionada **no cualquiera produce bloques**, lo cual conecta directamente con Hyperledger Fabric (Módulo 2). En la Fase C, cuando se conectan, reciben los bloques que el profesor ya ha minado.
+
+---
+
 ## Parte 1 — Inicializar la BBDD
+
+> **Fase A** (profesor en directo) y **Fase B** (cada alumno en su máquina).
 
 ### Ejercicio 1.1 — Init con `genesis.json`
 
@@ -77,6 +95,8 @@ mychaindata/
 ---
 
 ## Parte 2 — Crear una cuenta
+
+> **Fase A** y **Fase B**. Cada uno crea su propia cuenta en su propio `--datadir`.
 
 Una cuenta de Ethereum es un par clave privada / dirección. Vas a necesitarla para:
 
@@ -154,7 +174,9 @@ Si te aparece, perfecto. Si la lista está vacía, repite el `account new`.
 
 ## Parte 3 — Arrancar el nodo
 
-### Ejercicio 2.1 — Arranque con consola JavaScript
+> **Fase A** (profesor en directo) y **Fase B** (cada alumno en su máquina). Al final de esta Parte cada alumno tiene un nodo aislado en su propia cadena local — todavía sin red común.
+
+### Ejercicio 3.1 — Arranque con consola JavaScript
 
 ```bat
 :: cmd (Windows)
@@ -207,7 +229,7 @@ at block: 0 (Mon May 06 2026 ...)
 >
 ```
 
-### Ejercicio 2.2 — Entender cada flag
+### Ejercicio 3.2 — Entender cada flag
 
 | Flag | Para qué sirve |
 |------|----------------|
@@ -228,14 +250,24 @@ at block: 0 (Mon May 06 2026 ...)
 
 ---
 
+> **Fin de la Fase B.**
+>
+> En este punto cada alumno tiene un nodo geth corriendo en su máquina. Si ejecutas `eth.blockNumber` te dará `0` (solo el bloque génesis). Si haces `net.peerCount` te dará `0` (estás aislado). Si pruebas `miner.start(1)` no producirá bloques porque tu cuenta no es signer en este genesis.
+>
+> Eso es exactamente lo que queremos para terminar la Fase B: **N nodos solitarios, todos con el mismo bloque cero**. La Parte 4 te enseña a conectarte al nodo del profesor y unirte a la red común (Fase C).
+
+---
+
 ## Parte 4 — Conectar tu nodo a otros (formar red P2P)
+
+> **Fase C**. Todos los alumnos hacen esta parte juntos para formar la red común con el profesor.
 
 Para esta parte necesitamos definir **dos roles** en clase:
 
-- **Host** (1 alumno): el primero que arranca. Su nodo será el bootnode al que se conectan los demás. Va a publicar su enode URL para que el resto la copie.
-- **Joiners** (resto de alumnos): arrancan después y se conectan al host con `--bootnodes`. Una vez dentro, se descubren entre sí automáticamente.
+- **Host** (en esta práctica, **el profesor**): el primero que arrancó (en la Fase A). Su nodo es el bootnode al que se conectan los demás. Publica su enode URL en la pizarra.
+- **Joiners** (cada alumno): arrancan con `--bootnodes` apuntando al host. Una vez dentro, se descubren entre sí automáticamente.
 
-### Ejercicio 3.1 — (HOST) Componer tu enode URL "publicable"
+### Ejercicio 4.1 — (HOST) Componer tu enode URL "publicable"
 
 Hay dos piezas:
 
@@ -304,7 +336,7 @@ sudo iptables -A INPUT -p udp --dport 30303 -j ACCEPT
 
 > En macOS el firewall por defecto es por aplicación, no por puerto: la primera vez que `geth` intente escuchar en 30303 macOS preguntará si lo permites. Acepta y listo.
 
-### Ejercicio 3.2 — (JOINERS) Arrancar conectándose al bootnode
+### Ejercicio 4.2 — (JOINERS) Arrancar conectándose al bootnode
 
 Pega la enode publicada por el host como `--bootnodes` al arrancar tu nodo:
 
@@ -351,7 +383,7 @@ geth.exe --datadir mychaindata ^
 
 Geth se conecta al host al arrancar y aprende de él al resto de joiners conforme van llegando. Es exactamente cómo funciona Bitcoin con sus DNS-seeds y bootnodes oficiales.
 
-### Ejercicio 3.3 — Verifica que estáis conectados
+### Ejercicio 4.3 — Verifica que estáis conectados
 
 En cualquier nodo (host o joiner), en su consola JS:
 
@@ -377,7 +409,7 @@ Si tienes 4 nodos en clase (1 host + 3 joiners), todos deberían acabar con `pee
 
 > El propio host. En cuanto Joiner_B se conecta, el host le pasa a Joiner_A la enode de Joiner_B (gossip de peers). Joiner_A intenta entonces conectar directamente con Joiner_B. Tras unos segundos, todos los nodos se conocen entre todos sin haber tenido que hacer `admin.addPeer` ni una sola vez.
 
-### Ejercicio 3.4 — Alternativa: añadir peers en caliente
+### Ejercicio 4.4 — Alternativa: añadir peers en caliente
 
 Si el host arrancó después que tú, o si quieres añadir un peer una vez ya estás corriendo, también vale el modo caliente:
 
@@ -396,7 +428,9 @@ Devuelve `true` si la solicitud se ha registrado (no garantiza que la conexión 
 
 ## Parte 5 — Iniciar el minado
 
-Hasta ahora tu nodo está conectado y al día, pero no produce bloques. Sin un nodo minando, la cadena se queda parada en el bloque 0 (génesis) y las transacciones se acumulan en el mempool sin confirmar. En la práctica de aula, lo natural es que **un alumno** (típicamente el host) sea el que mine, y los demás solo reciban los bloques.
+> **Fase A — solo el profesor**. En esta práctica con genesis Clique, los alumnos no son signers y aunque ejecuten `miner.start()` no producirán bloques. Los alumnos lo verán "en directo" en sus nodos a partir de la Fase C, cuando se conecten al profesor: los bloques minados por él irán apareciendo automáticamente en `eth.blockNumber` de cada alumno por gossip P2P.
+
+Hasta ahora tu nodo está arrancado, pero no produce bloques. Sin un nodo minando, la cadena se queda parada en el bloque 0 (génesis) y las transacciones se acumulan en el mempool sin confirmar. El profesor es el único signer del genesis, así que es el único que puede producir bloques.
 
 ### Ejercicio 5.1 — Configurar el etherbase y arrancar el minado
 
@@ -483,7 +517,9 @@ En **Ethash** (PoW) cualquier nodo puede minar siempre que la `difficulty` del g
 
 ## Parte 6 — Demo: el primer bloque propagado
 
-Esto es lo que mejor demuestra que la red P2P "está viva". Llegados a este punto cada alumno tiene su nodo arrancado, su cuenta creada y al menos uno tiene el etherbase configurado.
+> **Fase C**. Punto culminante de la práctica: con todos los nodos conectados, observamos cómo los bloques minados por el profesor llegan a las cadenas de los alumnos.
+
+Esto es lo que mejor demuestra que la red P2P "está viva". Llegados a este punto cada alumno tiene su nodo arrancado, su cuenta creada y conectado al nodo del profesor.
 
 1. Cada alumno tiene su nodo en marcha (Partes 1 a 4 hechas).
 2. Uno publica su enode en la pizarra y los demás hacen `admin.addPeer(...)` o arrancan con `--bootnodes`.
