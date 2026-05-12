@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+//Versión ya deplegda y verificada: 0xf72e5734e0e7428E9546Ab1BBC23EEd227B22155
+
 /*
     Smart contract sencillo de contador con control de acceso.
 
