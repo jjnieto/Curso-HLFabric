@@ -82,6 +82,34 @@ El contrato es vulnerable al **doble voto por transferencia**:
 
 Esto se evita con **snapshot voting** (Compound, Uniswap, Aave): el peso se calcula con el balance en el bloque donde se creó la propuesta. En esta versión didáctica el bug queda expuesto para discutirlo en clase.
 
+## Ideas de mejora para el alumno
+
+Estas son propuestas concretas para extender el ejercicio. Algunas tocan el contrato, otras la dApp, otras ambos:
+
+### Sobre el contrato
+
+- 🛡️ **Evitar el doble voto por transferencia** (la vulnerabilidad descrita arriba). Implementar snapshot voting: guardar el balance de cada wallet en el bloque en que se creó la propuesta y usar ese valor como peso de voto, no el balance actual.
+- 🗂️ **Soportar varias propuestas activas a la vez** en lugar de solo una. Almacenarlas en un mapping con ID incremental.
+- ⏱️ **Permitir que cualquiera pueda cerrar una propuesta vencida** (ahora solo el owner). Si el owner desaparece, las propuestas pueden quedar abiertas para siempre.
+- 🔥 **Cobrar un fee en MyToken al crear propuesta** para evitar spam.
+- 📊 **Añadir opciones múltiples** (no solo Sí/No), con un array de opciones y votos por cada una.
+
+### Sobre la dApp
+
+- 📜 **Ampliar el rango de búsqueda del historial** más allá de los 50.000 bloques actuales (~7 días en Sepolia). Idea: usar un indexador como The Graph o paginar la búsqueda hacia atrás.
+- ⏳ **Mostrar propuestas vencidas pero aún no cerradas** en una sección aparte para que cualquiera vea que están listas para cerrarse.
+- 🔗 **Enlace a Etherscan** en cada propuesta del historial (a la transacción del cierre).
+- 📈 **Gráfica temporal de votos** dentro de una propuesta activa: cuántos votos se han ido acumulando en el tiempo.
+- 🔔 **Notificación push del navegador** cuando el owner abre una nueva propuesta o cuando vence el deadline.
+- 👥 **Lista de votantes** en cada propuesta (leyendo los eventos `Voted`) con su peso y elección.
+- 🌐 **Soporte multidioma** (es / en).
+- 🎨 **Modo claro** además del oscuro actual.
+
+### Ambición alta (proyecto fin de módulo)
+
+- 🏛️ **Sistema completo de DAO**: añadir mecanismos como votación cuadrática, delegación de votos, timelock antes de ejecutar resultados, integración con Snapshot.
+- 🔐 **Resistencia a flash loans**: estudia el ataque del Beanstalk DAO (2022) y añade la protección correspondiente.
+
 ## Stack
 
 - Vite 5
