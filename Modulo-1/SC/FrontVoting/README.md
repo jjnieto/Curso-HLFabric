@@ -27,11 +27,32 @@ La dirección del token ERC-20 de gobernanza se **autodetecta** llamando a `gove
 
 ## Setup
 
+### Si todavía NO tienes el repositorio (primera vez)
+
+Necesitas tener [Git](https://git-scm.com/downloads) instalado. Abre una terminal y ejecuta:
+
 ```bash
-cd FrontVoting
+git clone https://github.com/jjnieto/Curso-HLFabric.git
+cd Curso-HLFabric/Modulo-1/SC/FrontVoting
 npm install
 npm run dev
 ```
+
+### Si ya clonaste el repo antes (actualizar)
+
+Entra en la carpeta del repo y baja los últimos cambios:
+
+```bash
+cd Curso-HLFabric
+git pull
+cd Modulo-1/SC/FrontVoting
+npm install
+npm run dev
+```
+
+> Si `git pull` se queja de cambios locales, haz `git stash` antes (guarda tus cambios) o `git reset --hard origin/main` (los descarta).
+
+### Acceder a la dApp
 
 Abre [http://localhost:5174](http://localhost:5174) (configurable en `vite.config.js`).
 
