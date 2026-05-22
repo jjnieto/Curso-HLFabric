@@ -337,7 +337,12 @@ su certificado y su clave privada.
 ## 6. Cuándo se usa cada MSP
 
 Cuando un cliente envía una transacción, **se consultan los tres MSP
-en momentos distintos**:
+en momentos distintos**. Importante: **el orderer NO valida
+endorsements** — esa es una idea central del modelo
+Execute-Order-Validate. El orderer solo comprueba que el firmante de
+la tx tiene permiso de escritura en el canal (Writers policy) y la
+mete en un bloque. La validación real (endorsement policy, MVCC,
+read-set) la hacen los peers después.
 
 ```mermaid
 sequenceDiagram
@@ -353,23 +358,25 @@ sequenceDiagram
     Peer-->>Cli: Endorsement firmado
     Note over Peer: Firma el endorsement con<br/>SU MSP LOCAL (clave del peer)
     Cli->>Ord: tx + endorsements
-    Note over Ord: Valida firmas contra el<br/>MSP DEL CANAL (que también<br/>tiene la raíz del orderer)
-    Ord->>Block: Mete tx en bloque
+    Note over Ord: SOLO comprueba que el firmante<br/>tiene permisos de Writer en el canal<br/>(MSP del canal + Writers policy).<br/>NO valida endorsements.
+    Ord->>Block: Mete tx en bloque<br/>(firma el bloque con su MSP local)
     Block->>Peer: Distribuye bloque
-    Note over Peer: En la fase Validate, comprueba<br/>las firmas contra el<br/>MSP DEL CANAL otra vez
+    Note over Peer: Fase VALIDATE:<br/>1) firma del bloque del orderer (MSP del canal)<br/>2) endorsement policy de cada tx (MSP del canal)<br/>3) MVCC sobre el world state
 ```
 
 **Resumen:**
 
-| Cuándo                                            | Qué MSP se usa            | Para qué                           |
-|---------------------------------------------------|---------------------------|------------------------------------|
-| El cliente firma una propuesta                    | MSP local del User1       | Acceso a su clave privada          |
-| El peer endorser valida la firma del cliente      | MSP del canal             | Verifica con la raíz de Org1       |
-| El peer endorser firma su endorsement             | MSP local del peer        | Acceso a su clave privada          |
-| El peer commiter valida un bloque                 | MSP del canal             | Verifica firmas de orderer y peers |
-| El admin instala un chaincode (`peer lifecycle`)  | MSP local del Admin       | Acceso a clave de admin            |
-| El orderer arranca                                | MSP local del orderer     | Identidad propia del orderer       |
-| Se crea el canal                                  | MSP plantilla (`MSPDir:`) | Para incrustarse en el config block|
+| Cuándo                                                | Qué MSP se usa            | Para qué                                                              |
+|-------------------------------------------------------|---------------------------|-----------------------------------------------------------------------|
+| El cliente firma una propuesta                        | MSP local del User1       | Acceso a su clave privada                                             |
+| El peer endorser valida la firma del cliente          | MSP del canal             | Verifica que el cliente pertenece a una org reconocida                |
+| El peer endorser firma su endorsement                 | MSP local del peer        | Acceso a su clave privada                                             |
+| El orderer recibe una tx                              | MSP del canal             | Solo comprueba la Writers policy (¿puede este firmante escribir?). NO valida endorsements. |
+| El orderer firma el bloque                            | MSP local del orderer     | Acceso a la clave del orderer                                         |
+| El peer (committer) valida un bloque (fase Validate)  | MSP del canal             | Verifica firma del bloque + endorsement policy + MVCC                 |
+| El admin instala un chaincode (`peer lifecycle`)      | MSP local del Admin       | Acceso a clave de admin                                               |
+| El orderer arranca                                    | MSP local del orderer     | Identidad propia del orderer                                          |
+| Se crea el canal                                      | MSP plantilla (`MSPDir:`) | Para incrustarse en el config block                                   |
 
 ---
 
