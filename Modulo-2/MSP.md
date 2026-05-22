@@ -88,6 +88,108 @@ validar transacciones de OTRAS orgs.
 > Org2 ni a su CA. Mira el **MSP del canal** (que tiene la raíz
 > de Org2 publicada ahí) y valida localmente.
 
+### 2.4 Inciso: ¿y qué es el config block?
+
+Como acabamos de decir que el MSP del canal "vive dentro del config
+block", conviene aclarar qué es eso. Es un punto que confunde casi
+tanto como el propio MSP.
+
+El **config block** es un bloque más dentro de la blockchain del
+canal, pero con contenido especial: en lugar de transacciones de
+negocio, lleva la **configuración del canal** (orgs miembro, MSPs,
+policies, parámetros del orderer, anchor peers…).
+
+La cadena de un canal no es uniforme — es una mezcla:
+
+```
+Bloque 0  → CONFIG BLOCK (génesis: configuración inicial)
+Bloque 1  → transacciones de negocio
+Bloque 2  → transacciones de negocio
+Bloque 3  → CONFIG BLOCK (alguien añadió Org3 al canal)
+Bloque 4  → transacciones de negocio
+Bloque 5  → CONFIG BLOCK (cambio de policies)
+Bloque 6  → transacciones de negocio
+...
+```
+
+El primer config block se llama **bloque génesis**. Cada cambio
+posterior (añadir org, cambiar MSP, actualizar policies, cambiar
+timeouts del orderer…) genera un nuevo config block. **La
+configuración VIGENTE del canal es la del config block más reciente**.
+
+Estructura interna:
+
+```
+ConfigBlock
+└── ChannelGroup
+    ├── Application
+    │   ├── Orgs
+    │   │   ├── Org1MSP   ← AQUÍ va el MSP de Org1 (cacerts, admins, OUs…)
+    │   │   ├── Org2MSP
+    │   │   └── Org3MSP
+    │   └── Policies (Readers, Writers, Admins, LifecycleEndorsement…)
+    ├── Orderer
+    │   ├── Orgs → OrdererMSP
+    │   ├── BatchSize / BatchTimeout
+    │   ├── ConsensusType (etcdraft + nodos del cluster)
+    │   └── Policies
+    └── Capabilities / Hashing algorithm / Consortium
+```
+
+Esa sección `OrgXMSP` dentro del config block es **literalmente** lo
+que vimos antes en la carpeta `msp/` de la organización: los root
+certs, intermedias, admins y OUs. **No es un fichero separado: es esta
+sección dentro del bloque.**
+
+#### Por qué importa que viva en la blockchain
+
+- **Auditabilidad**: cualquier cambio queda registrado para siempre,
+  firmado por quien lo hizo, en su propio bloque. No se puede meter
+  una org sin dejar rastro.
+- **Consistencia distribuida**: cuando un peer hace `peer channel
+  join`, descarga toda la blockchain, lee el último config block y
+  aplica esa configuración localmente. Todos los peers ven la MISMA
+  configuración porque la leen del mismo sitio.
+- **Gobernanza**: cambiar la configuración requiere firmas según la
+  policy `Channel/Application/Admins` (típicamente MAJORITY de
+  admins). No es un fichero que un solo admin pueda editar.
+
+#### Cómo se inspecciona
+
+```bash
+# Bajar el último config block del canal
+peer channel fetch config config_block.pb -c mychannel \
+  -o orderer.example.com:7050 --tls --cafile $ORDERER_CA
+
+# Convertirlo a JSON legible
+configtxlator proto_decode --input config_block.pb \
+  --type common.Block --output config_block.json
+```
+
+En el JSON resultante verás cada `OrgMSP` expandido con sus
+`root_certs`, `admins`, `tls_root_certs`, `revocation_list` y todas
+las policies en formato legible.
+
+#### Cómo se modifica
+
+Nunca se edita directamente. El flujo de un **channel config update**:
+
+1. Bajas el config actual.
+2. Lo conviertes a JSON y lo modificas (añades una org, cambias una
+   policy…).
+3. Generas un **delta** entre el original y el modificado.
+4. Lo firmas con los admins requeridos por la policy del canal.
+5. Lo envías al orderer con `peer channel update`.
+6. El orderer valida las firmas y, si cumplen, crea el nuevo config
+   block y lo distribuye.
+7. Los peers lo reciben, leen la nueva configuración y se actualizan
+   en caliente (no hace falta reiniciar).
+
+> 💡 **Idea clave:** el MSP del canal no es un fichero ni una base
+> de datos. Es una sección dentro del último config block de la
+> propia blockchain del canal. Por eso es auditable, compartido y
+> está sujeto a las policies del canal para modificarse.
+
 ---
 
 ## 3. Anatomía detallada de una carpeta `msp/`
