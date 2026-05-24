@@ -91,12 +91,49 @@ sequenceDiagram
 
 ## Prerequisitos
 
-Estos ejemplos asumen que tienes la red levantada (ver docs anteriores) y las variables de entorno configuradas:
+Antes de empezar el lifecycle, asegúrate de estar en el sitio correcto, con la red arrancada limpia y las variables de entorno configuradas. Sigue estos pasos en orden:
+
+### 1. Situarse en el directorio de la test network
+
+Todo el documento asume que ejecutas los comandos desde `fabric-samples/test-network`. Las rutas relativas (`../bin`, `../asset-transfer-basic/...`, `../config/`) dependen de eso:
+
+```bash
+cd ~/fabric-samples/test-network
+```
+
+### 2. Limpiar la red anterior (por si acaso)
+
+Si has hecho prácticas antes en esta sesión, lo más seguro es bajarla por completo para evitar restos de chaincodes, canales o volúmenes Docker antiguos:
+
+```bash
+./network.sh down
+```
+
+Esto elimina contenedores, material criptográfico, artefactos del canal y volúmenes. Empezamos desde cero.
+
+### 3. Arrancar la red con un canal
+
+```bash
+./network.sh up createChannel -c mychannel -ca
+```
+
+Esto levanta dos peers (Org1, Org2), un orderer, las CAs y crea el canal `mychannel`. **Todo el resto del documento asume que el canal se llama `mychannel`** — si lo cambias, deberás ajustar el flag `--channelID` en cada comando.
+
+> **Si vas a usar CouchDB** como state database (recomendado para inspeccionar el world state desde Fauxton, ver [couchdb.md](couchdb.md)), añade `-s couchdb` al comando:
+> ```bash
+> ./network.sh up createChannel -c mychannel -ca -s couchdb
+> ```
+
+### 4. Configurar PATH y FABRIC_CFG_PATH
+
+Sin esto, el binario `peer` no se encuentra y los comandos fallan con "command not found" o "FABRIC_CFG_PATH not set":
 
 ```bash
 export PATH=${PWD}/../bin:$PATH
 export FABRIC_CFG_PATH=${PWD}/../config/
 ```
+
+> **Truco:** si en cualquier momento se cierra la terminal o pierdes las variables, basta con volver a `cd ~/fabric-samples/test-network` y volver a ejecutar estas dos `export`. La red seguirá arrancada (los contenedores Docker no se caen al cerrar la terminal).
 
 ---
 
