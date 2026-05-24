@@ -358,7 +358,7 @@ sequenceDiagram
     Peer-->>Cli: Endorsement firmado
     Note over Peer: Firma el endorsement con<br/>SU MSP LOCAL (clave del peer)
     Cli->>Ord: tx + endorsements
-    Note over Ord: SOLO comprueba que el firmante<br/>tiene permisos de Writer en el canal<br/>(MSP del canal + Writers policy).<br/>NO valida endorsements.
+    Note over Ord: NO valida la endorsement policy.
     Ord->>Block: Mete tx en bloque<br/>(firma el bloque con su MSP local)
     Block->>Peer: Distribuye bloque
     Note over Peer: Fase VALIDATE:<br/>1) firma del bloque del orderer (MSP del canal)<br/>2) endorsement policy de cada tx (MSP del canal)<br/>3) MVCC sobre el world state
