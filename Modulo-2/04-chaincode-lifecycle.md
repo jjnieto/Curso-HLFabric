@@ -437,23 +437,77 @@ El sequence actúa como un **número de versión del despliegue** (no del códig
 
 > **Importante:** El World State se **preserva** entre actualizaciones. Los datos no se pierden. Pero hay que tener cuidado con la compatibilidad: si el nuevo código espera campos que no existen en los datos antiguos, hay que manejar la migración (ver Módulo 4, día 5).
 
-Para actualizar un chaincode ya desplegado, repetir el flujo con **sequence incrementado**:
+Para actualizar un chaincode ya desplegado, repetir el flujo con **sequence incrementado**. A continuación los pasos en detalle.
+
+### 6.1 Empaquetar la nueva versión
+
+Con el código modificado, generar un nuevo paquete con label distinto al de la v1 (`basic_2.0` en lugar de `basic_1.0`):
 
 ```bash
-# 1. Empaquetar nueva versión
 peer lifecycle chaincode package basic_2.tar.gz \
   --path ../asset-transfer-basic/chaincode-go/ \
   --lang golang \
   --label basic_2.0
+```
 
-# 2. Instalar en todos los peers
+### 6.2 Instalar en peer0.org1
+
+```bash
+# Configurar entorno como Org1
+export CORE_PEER_TLS_ENABLED=true
+export CORE_PEER_LOCALMSPID=Org1MSP
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+
 peer lifecycle chaincode install basic_2.tar.gz
+```
 
-# 3. Obtener nuevo Package ID
+### 6.3 Instalar en peer0.org2
+
+```bash
+# Cambiar entorno a Org2
+export CORE_PEER_LOCALMSPID=Org2MSP
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
+export CORE_PEER_ADDRESS=localhost:9051
+
+peer lifecycle chaincode install basic_2.tar.gz
+```
+
+### 6.4 Consultar el nuevo Package ID
+
+Ahora `queryinstalled` mostrará **los dos chaincodes** instalados (v1 y v2). Hay que coger el que tiene el label `basic_2.0`:
+
+```bash
 peer lifecycle chaincode queryinstalled
-export CC_PACKAGE_ID=basic_2.0:...
+```
 
-# 4. Aprobar con sequence=2 (cada org)
+Resultado (algo así):
+
+```
+Installed chaincodes on peer:
+Package ID: basic_1.0:abc123def456..., Label: basic_1.0
+Package ID: basic_2.0:f1e2d3c4b5a6..., Label: basic_2.0
+```
+
+Copiar el **Package ID de la línea con `Label: basic_2.0`** y exportarlo (sobreescribe la variable de la v1):
+
+```bash
+export CC_PACKAGE_ID=basic_2.0:f1e2d3c4b5a6...
+```
+
+> El Package ID es un hash del paquete, así que el de v2 es el mismo en todos los peers donde se haya instalado. No hace falta volver a consultarlo cambiando de org.
+
+### 6.5 Aprobar como Org1
+
+```bash
+# Asegurarse de estar como Org1
+export CORE_PEER_LOCALMSPID=Org1MSP
+export CORE_PEER_ADDRESS=localhost:7051
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+
 peer lifecycle chaincode approveformyorg \
   -o localhost:7050 \
   --ordererTLSHostnameOverride orderer.example.com \
@@ -464,8 +518,54 @@ peer lifecycle chaincode approveformyorg \
   --version 2.0 \
   --package-id $CC_PACKAGE_ID \
   --sequence 2
+```
 
-# 5. Commit con sequence=2
+### 6.6 Aprobar como Org2
+
+```bash
+# Cambiar entorno a Org2
+export CORE_PEER_LOCALMSPID=Org2MSP
+export CORE_PEER_ADDRESS=localhost:9051
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+
+peer lifecycle chaincode approveformyorg \
+  -o localhost:7050 \
+  --ordererTLSHostnameOverride orderer.example.com \
+  --tls \
+  --cafile "${PWD}/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/tlscacerts/tlsca.example.com-cert.pem" \
+  --channelID mychannel \
+  --name basic \
+  --version 2.0 \
+  --package-id $CC_PACKAGE_ID \
+  --sequence 2
+```
+
+### 6.7 Verificar quién ha aprobado
+
+```bash
+peer lifecycle chaincode checkcommitreadiness \
+  --channelID mychannel \
+  --name basic \
+  --version 2.0 \
+  --sequence 2 \
+  --output json
+```
+
+Debe salir `true` para ambas orgs:
+
+```json
+{
+  "approvals": {
+    "Org1MSP": true,
+    "Org2MSP": true
+  }
+}
+```
+
+### 6.8 Commit con sequence=2
+
+```bash
 peer lifecycle chaincode commit \
   -o localhost:7050 \
   --ordererTLSHostnameOverride orderer.example.com \
@@ -480,6 +580,14 @@ peer lifecycle chaincode commit \
   --peerAddresses localhost:9051 \
   --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt"
 ```
+
+### 6.9 Verificar que la nueva versión está activa
+
+```bash
+peer lifecycle chaincode querycommitted --channelID mychannel --name basic
+```
+
+Debe aparecer `Version: 2.0, Sequence: 2`. A partir de aquí, todas las invocaciones se ejecutarán contra el nuevo chaincode y el world state previo sigue intacto.
 
 > **Nota importante:** El world state se **preserva** entre actualizaciones. No se pierden datos.
 
