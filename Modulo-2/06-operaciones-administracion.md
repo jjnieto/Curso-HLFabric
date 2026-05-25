@@ -227,26 +227,200 @@ docker ps --format "table {{.Names}}\t{{.Status}}"
 
 ### 0.3 Crear canal y unir peers
 
-> **Nota sobre `configtx.yaml`**: el doc 05 no genera este archivo (su objetivo es solo Fabric CA y los MSPs). Para generar el bloque génesis necesitas un `configtx.yaml` en `$PWD`. Lo más rápido es copiar el del [doc 03](03-crear-red-personalizada.md) y adaptar **cuatro líneas**:
->
-> - Los `MSPDir` de cada org: deben apuntar a `organizations/peerOrganizations/orgX.example.com/msp` (la estructura que construiste en el paso 7 del doc 05). Suelen ya estar así.
-> - El nombre del perfil (`TwoOrgsChannel`) y el `channelID` (`mychannel`) son arbitrarios — usa los mismos en `-profile` y `-channelID` aquí abajo.
->
-> Si te encuentras con errores tipo `could not load MSP configuration: open .../msp/cacerts: no such file or directory`, es porque las rutas del configtx no coinciden con la estructura `organizations/`.
+Esta sub-sección está dividida en 5 pasos. Síguelos en orden desde `$HOME/red-con-ca/`.
+
+#### 0.3.1 Crear `configtx.yaml`
+
+El doc 05 no genera este archivo. Lo crearemos ahora, ya adaptado a la estructura `organizations/` que produjo el paso 7 del doc 05 (NO a `crypto-config/` que usa el doc 03).
+
+Crea el archivo `$HOME/red-con-ca/configtx.yaml` con el siguiente contenido **tal cual** (no hace falta adaptar nada):
+
+```yaml
+# configtx.yaml
+---
+Organizations:
+  - &OrdererOrg
+    Name: OrdererOrg
+    ID: OrdererMSP
+    MSPDir: organizations/ordererOrganizations/example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.example.com:7050
+
+  - &Org1
+    Name: Org1MSP
+    ID: Org1MSP
+    MSPDir: organizations/peerOrganizations/org1.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('Org1MSP.admin', 'Org1MSP.peer', 'Org1MSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('Org1MSP.admin', 'Org1MSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('Org1MSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('Org1MSP.peer')"
+    AnchorPeers:
+      - Host: peer0.org1.example.com
+        Port: 7051
+
+  - &Org2
+    Name: Org2MSP
+    ID: Org2MSP
+    MSPDir: organizations/peerOrganizations/org2.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('Org2MSP.admin', 'Org2MSP.peer', 'Org2MSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('Org2MSP.admin', 'Org2MSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('Org2MSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('Org2MSP.peer')"
+    AnchorPeers:
+      - Host: peer0.org2.example.com
+        Port: 9051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.example.com
+        Port: 7050
+        ClientTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  TwoOrgsChannel:
+    <<: *ChannelDefaults
+    Consortium: SampleConsortium
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+      Capabilities: *OrdererCapabilities
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Org1
+        - *Org2
+      Capabilities: *ApplicationCapabilities
+```
+
+> **Errores comunes con este archivo:**
+> - `could not load MSP configuration: open .../msp/cacerts: no such file or directory` → las rutas `MSPDir` no apuntan a una estructura `organizations/` válida. Verifica que el paso 7 del doc 05 se completó.
+> - `Error reading configuration: while parsing config: yaml ...` → indentación rota. Es YAML; respeta los espacios.
+
+#### 0.3.2 Generar el bloque génesis del canal
+
+Para `configtxgen` el `FABRIC_CFG_PATH` debe ser el directorio donde está `configtx.yaml` (es decir, `$PWD`):
 
 ```bash
-# Variables comunes
+cd $HOME/red-con-ca
+mkdir -p channel-artifacts
+
 export FABRIC_CFG_PATH=$PWD
+
+configtxgen -profile TwoOrgsChannel \
+  -outputBlock channel-artifacts/mychannel.block \
+  -channelID mychannel
+```
+
+Comprueba que se generó el bloque:
+
+```bash
+ls -la channel-artifacts/mychannel.block
+```
+
+#### 0.3.3 Unir el orderer al canal
+
+```bash
+# Rutas TLS del orderer (las usa osnadmin)
 export ORDERER_CA=$PWD/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
 export ORDERER_ADMIN_TLS_CERT=$PWD/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
 export ORDERER_ADMIN_TLS_KEY=$PWD/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
 
-# Generar bloque génesis del canal
-configtxgen -profile TwoOrgsChannel \
-  -outputBlock channel-artifacts/mychannel.block \
-  -channelID mychannel
-
-# Unir orderer al canal
 osnadmin channel join \
   --channelID mychannel \
   --config-block channel-artifacts/mychannel.block \
@@ -254,21 +428,35 @@ osnadmin channel join \
   --ca-file $ORDERER_CA \
   --client-cert $ORDERER_ADMIN_TLS_CERT \
   --client-key $ORDERER_ADMIN_TLS_KEY
+```
 
-# Unir peer Org1
+#### 0.3.4 Unir el peer de Org1
+
+A partir de aquí los comandos `peer` necesitan que `FABRIC_CFG_PATH` apunte al `core.yaml` de fabric-samples (no a tu `configtx.yaml`). Es un cambio intencionado:
+
+```bash
+# core.yaml por defecto para el cliente peer
 export FABRIC_CFG_PATH=$HOME/fabric/fabric-samples/config
+
+# Identidad y endpoint de Org1
 export CORE_PEER_TLS_ENABLED=true
 export CORE_PEER_LOCALMSPID=Org1MSP
-export CORE_PEER_TLS_ROOTCERT_FILE=$PWD/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
-export CORE_PEER_MSPCONFIGPATH=$PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+export CORE_PEER_TLS_ROOTCERT_FILE=$HOME/red-con-ca/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=$HOME/red-con-ca/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
 export CORE_PEER_ADDRESS=localhost:7051
 
+cd $HOME/red-con-ca
 peer channel join -b channel-artifacts/mychannel.block
+```
 
-# Unir peer Org2
+#### 0.3.5 Unir el peer de Org2
+
+Cambiamos las variables del peer (no hace falta tocar `FABRIC_CFG_PATH`):
+
+```bash
 export CORE_PEER_LOCALMSPID=Org2MSP
-export CORE_PEER_TLS_ROOTCERT_FILE=$PWD/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
-export CORE_PEER_MSPCONFIGPATH=$PWD/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
+export CORE_PEER_TLS_ROOTCERT_FILE=$HOME/red-con-ca/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=$HOME/red-con-ca/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
 export CORE_PEER_ADDRESS=localhost:9051
 
 peer channel join -b channel-artifacts/mychannel.block
@@ -537,13 +725,93 @@ fabric-ca-client enroll \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
 ```
 
-Construye después el MSP de Org3 siguiendo exactamente la misma estructura del paso 7 del [doc 05](05-fabric-ca.md) (en `organizations/peerOrganizations/org3.example.com/`).
-
-#### 2.2 Generar la definición JSON de Org3
-
-Añade Org3 al `configtx.yaml` y genera su definición:
+Construye después el MSP de Org3 con los siguientes comandos (mismo patrón que el paso 7 del doc 05):
 
 ```bash
+cd $HOME/red-con-ca
+
+ORG3_PEER_DIR=organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com
+ORG3_ADMIN_DIR=organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com
+ORG3_MSP_DIR=organizations/peerOrganizations/org3.example.com/msp
+
+# Carpetas
+mkdir -p $ORG3_MSP_DIR/{cacerts,tlscacerts}
+mkdir -p $ORG3_PEER_DIR/{msp/{cacerts,tlscacerts,signcerts,keystore},tls}
+mkdir -p $ORG3_ADMIN_DIR/msp/{cacerts,tlscacerts,signcerts,keystore}
+
+# Cert raíz de la CA en el MSP de la org
+cp fabric-ca/org3/tls-cert.pem $ORG3_MSP_DIR/cacerts/ca-cert.pem
+cp fabric-ca/org3/tls-cert.pem $ORG3_MSP_DIR/tlscacerts/tlsca-cert.pem
+
+# config.yaml de NodeOUs (clasifica admin/peer/client por OU)
+cat > $ORG3_MSP_DIR/config.yaml <<'YAML'
+NodeOUs:
+  Enable: true
+  ClientOUIdentifier:
+    Certificate: cacerts/ca-cert.pem
+    OrganizationalUnitIdentifier: client
+  PeerOUIdentifier:
+    Certificate: cacerts/ca-cert.pem
+    OrganizationalUnitIdentifier: peer
+  AdminOUIdentifier:
+    Certificate: cacerts/ca-cert.pem
+    OrganizationalUnitIdentifier: admin
+  OrdererOUIdentifier:
+    Certificate: cacerts/ca-cert.pem
+    OrganizationalUnitIdentifier: orderer
+YAML
+
+# MSP del peer
+cp fabric-ca/org3/peer0/msp/signcerts/cert.pem  $ORG3_PEER_DIR/msp/signcerts/
+cp fabric-ca/org3/peer0/msp/keystore/*          $ORG3_PEER_DIR/msp/keystore/priv_sk
+cp fabric-ca/org3/tls-cert.pem                  $ORG3_PEER_DIR/msp/cacerts/ca-cert.pem
+cp fabric-ca/org3/tls-cert.pem                  $ORG3_PEER_DIR/msp/tlscacerts/tlsca-cert.pem
+cp $ORG3_MSP_DIR/config.yaml                    $ORG3_PEER_DIR/msp/config.yaml
+
+# TLS del peer (server.crt, server.key, ca.crt) - usamos el enroll TLS
+cp fabric-ca/org3/peer0/tls/msp/signcerts/cert.pem  $ORG3_PEER_DIR/tls/server.crt
+cp fabric-ca/org3/peer0/tls/msp/keystore/*          $ORG3_PEER_DIR/tls/server.key
+cp fabric-ca/org3/tls-cert.pem                      $ORG3_PEER_DIR/tls/ca.crt
+
+# MSP del admin
+cp fabric-ca/org3/org3admin/msp/signcerts/cert.pem $ORG3_ADMIN_DIR/msp/signcerts/
+cp fabric-ca/org3/org3admin/msp/keystore/*         $ORG3_ADMIN_DIR/msp/keystore/priv_sk
+cp fabric-ca/org3/tls-cert.pem                     $ORG3_ADMIN_DIR/msp/cacerts/ca-cert.pem
+cp fabric-ca/org3/tls-cert.pem                     $ORG3_ADMIN_DIR/msp/tlscacerts/tlsca-cert.pem
+cp $ORG3_MSP_DIR/config.yaml                       $ORG3_ADMIN_DIR/msp/config.yaml
+```
+
+#### 2.2 Añadir Org3 al `configtx.yaml` y generar su definición JSON
+
+Edita `$HOME/red-con-ca/configtx.yaml` (el que creaste en el paso 0.3.1) y **añade este bloque dentro de la sección `Organizations:`** (al final, después de `&Org2`):
+
+```yaml
+  - &Org3
+    Name: Org3MSP
+    ID: Org3MSP
+    MSPDir: organizations/peerOrganizations/org3.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('Org3MSP.admin', 'Org3MSP.peer', 'Org3MSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('Org3MSP.admin', 'Org3MSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('Org3MSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('Org3MSP.peer')"
+    AnchorPeers:
+      - Host: peer0.org3.example.com
+        Port: 11051
+```
+
+Genera ahora la definición de Org3 que se incrustará en el config update del canal:
+
+```bash
+cd $HOME/red-con-ca
 export FABRIC_CFG_PATH=$PWD
 configtxgen -printOrg Org3MSP > channel-artifacts/org3-definition.json
 ```
@@ -626,13 +894,100 @@ peer channel update -f channel-artifacts/config_update_envelope.pb \
 
 > **¿Y si faltan firmas?** Con `MAJORITY Admins`, en una red de 2 orgs hace falta firma de las dos. Si solo firma una, `peer channel update` devuelve `error: error applying config update to existing channel ... permission denied`. Resuelve recopilando las firmas que falten (ver sección 3.6 más abajo).
 
-#### 2.7 Unir el peer de Org3
+#### 2.7 Levantar el peer y CouchDB de Org3
+
+Antes de unir al canal nada de Org3, hay que arrancar el contenedor del peer (y su CouchDB). En tu fichero `docker/docker-compose-net.yaml`, añade estos dos servicios bajo `services:`:
+
+```yaml
+  couchdb.org3:
+    container_name: couchdb.org3
+    image: couchdb:3.3
+    environment:
+      - COUCHDB_USER=admin
+      - COUCHDB_PASSWORD=adminpw
+    ports:
+      - 11984:5984
+    networks:
+      - fabric-ca-net
+
+  peer0.org3.example.com:
+    container_name: peer0.org3.example.com
+    image: hyperledger/fabric-peer:2.5
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_ID=peer0.org3.example.com
+      - CORE_PEER_ADDRESS=peer0.org3.example.com:11051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:11051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org3.example.com:11052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:11052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org3.example.com:11051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org3.example.com:11051
+      - CORE_PEER_LOCALMSPID=Org3MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric-ca-net
+      - CORE_LEDGER_STATE_STATEDATABASE=CouchDB
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS=couchdb.org3:5984
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME=admin
+      - CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD=adminpw
+      - CORE_OPERATIONS_LISTENADDRESS=peer0.org3.example.com:9446
+    command: peer node start
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ../organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/msp:/etc/hyperledger/fabric/msp
+      - ../organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls:/etc/hyperledger/fabric/tls
+      - peer0.org3.example.com:/var/hyperledger/production
+    ports:
+      - 11051:11051
+      - 9446:9446
+    depends_on:
+      - couchdb.org3
+    networks:
+      - fabric-ca-net
+```
+
+Y añade el nuevo volumen al bloque `volumes:` de arriba del mismo fichero:
+
+```yaml
+volumes:
+  orderer.example.com:
+  peer0.org1.example.com:
+  peer0.org2.example.com:
+  peer0.org3.example.com:   # ← añadir esta línea
+```
+
+Levanta solo los dos servicios nuevos sin tocar el resto:
 
 ```bash
+cd $HOME/red-con-ca
+docker compose -f docker/docker-compose-net.yaml up -d couchdb.org3 peer0.org3.example.com
+```
+
+Verifica que los dos contenedores están corriendo:
+
+```bash
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "org3|couchdb.org3"
+```
+
+#### 2.8 Unir el peer de Org3 al canal
+
+Ahora sí, con el peer ya arrancado, lo unimos al canal:
+
+```bash
+# FABRIC_CFG_PATH al core.yaml de fabric-samples (no al configtx)
+export FABRIC_CFG_PATH=$HOME/fabric/fabric-samples/config
+
 export CORE_PEER_LOCALMSPID=Org3MSP
+export CORE_PEER_TLS_ENABLED=true
 export CORE_PEER_ADDRESS=localhost:11051
-export CORE_PEER_TLS_ROOTCERT_FILE=$PWD/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
-export CORE_PEER_MSPCONFIGPATH=$PWD/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp
+export CORE_PEER_TLS_ROOTCERT_FILE=$HOME/red-con-ca/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=$HOME/red-con-ca/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp
+
+cd $HOME/red-con-ca
 
 # Obtener bloque genesis
 peer channel fetch 0 channel-artifacts/mychannel.block \
@@ -645,7 +1000,7 @@ peer channel fetch 0 channel-artifacts/mychannel.block \
 peer channel join -b channel-artifacts/mychannel.block
 ```
 
-#### 2.8 Verificar que Org3 está activa en el canal
+#### 2.9 Verificar que Org3 está activa en el canal
 
 Tras unir Org3, deberías ver tres cosas:
 
@@ -673,7 +1028,7 @@ peer chaincode query -C mychannel -n basic -c '{"Args":["GetAllAssets"]}'
 # Esperado: mismo resultado que desde Org1 u Org2
 ```
 
-#### 2.9 ¿Org3 como endorsing peer del chaincode existente?
+#### 2.10 ¿Org3 como endorsing peer del chaincode existente?
 
 Unir el peer al canal **no** convierte automáticamente a Org3 en endorsing peer del chaincode `basic`. Para que Org3 pueda endorsar transacciones tienes que **redesplegar el chaincode con sequence + 1** incluyendo a Org3 en las aprobaciones:
 
@@ -1153,29 +1508,46 @@ peer channel join -b channel-artifacts/mychannel.block
 >
 > **Nota importante**: la rotación de certificados de **enrollment** (no TLS) no requiere reiniciar el nodo, basta con que el cliente use el nuevo cert al firmar transacciones. Pero la rotación de **TLS** sí requiere reinicio del proceso del peer/orderer porque el TLS se carga al arrancar.
 
-Usando la Fabric CA del doc 05, renovar certificados es sencillo:
+Usando la Fabric CA del doc 05, renovar certificados es sencillo. **Importante:** usa un directorio NUEVO para el `reenroll` (no machaques el del enrol inicial, te interesa conservarlo como referencia) y haz backup de los TLS actuales antes de reemplazarlos — si algo falla, vuelves al estado previo en segundos.
 
 ```bash
-# 1. Reenrollar el peer con nuevos certs
-export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org1/peer0
+cd $HOME/red-con-ca
+
+# 0. Backup de los TLS actuales (por si algo va mal)
+ORG1_TLS_DIR=$PWD/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls
+cp -r $ORG1_TLS_DIR ${ORG1_TLS_DIR}.bak.$(date +%Y%m%d)
+
+# 1. Reenrollar el peer con nuevos certs, en una carpeta NUEVA
+#    (NO uses $PWD/fabric-ca/org1/peer0/tls porque machacarías el enrol original)
+export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org1/peer0-tls-reenroll
 
 fabric-ca-client reenroll \
+  -u https://localhost:7054 \
   --caname ca-org1 \
+  --enrollment.profile tls \
   --csr.hosts peer0.org1.example.com,localhost \
   --tls.certfiles $PWD/fabric-ca/org1/tls-cert.pem
 
-# 2. Copiar los nuevos certs al MSP del peer
-cp $FABRIC_CA_CLIENT_HOME/msp/signcerts/cert.pem \
-   $PWD/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/server.crt
-cp $FABRIC_CA_CLIENT_HOME/msp/keystore/*_sk \
-   $PWD/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/server.key
+# 2. Copiar los nuevos certs al directorio TLS del peer
+cp $FABRIC_CA_CLIENT_HOME/msp/signcerts/cert.pem  $ORG1_TLS_DIR/server.crt
+cp $FABRIC_CA_CLIENT_HOME/msp/keystore/*_sk       $ORG1_TLS_DIR/server.key
 
-# 3. Reiniciar el peer
+# 3. Reiniciar el peer para que cargue los nuevos certificados
 docker restart peer0.org1.example.com
 
-# 4. Verificar que sigue funcionando
+# 4. Verificar que sigue funcionando (lista canales del peer)
+export CORE_PEER_LOCALMSPID=Org1MSP
+export CORE_PEER_ADDRESS=localhost:7051
+export CORE_PEER_TLS_ROOTCERT_FILE=$ORG1_TLS_DIR/ca.crt
+export CORE_PEER_MSPCONFIGPATH=$PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
 peer channel list
 ```
+
+Si todo va bien, ya puedes borrar el backup `${ORG1_TLS_DIR}.bak.YYYYMMDD` cuando lleves unos días sin incidencias.
+
+> **Si el peer no arranca tras el reinicio:** restaura el backup
+> (`rm -rf $ORG1_TLS_DIR && mv ${ORG1_TLS_DIR}.bak.YYYYMMDD $ORG1_TLS_DIR && docker restart peer0.org1.example.com`)
+> y revisa los logs del peer con `docker logs peer0.org1.example.com`. Causas habituales: el cert nuevo no incluye el SANS de `localhost` (faltó `--csr.hosts`), o el `keystore/*_sk` no se copió correctamente.
 
 ### Rotación de certificados de enrollment (no TLS)
 
