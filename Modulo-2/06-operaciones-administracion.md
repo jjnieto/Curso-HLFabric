@@ -1,19 +1,19 @@
-# 06 - Operaciones de administracion
+# 06 — Operaciones de administración
 
 ## Visión general
 
-Este documento parte de la red montada con Fabric CA en el [doc 05](05-fabric-ca.md). Completamos la red con peers y orderer, desplegamos un chaincode y practicamos las operaciones de administracion mas comunes.
+Este documento parte de la red montada con Fabric CA en el [doc 05](05-fabric-ca.md). Completamos la red con peers y orderer, desplegamos un chaincode y practicamos las operaciones de administración más comunes.
 
 ```mermaid
 graph TB
     subgraph "Lo que vamos a hacer"
         A["0. Completar la red<br/>(peers + orderer + canal)"]
         B["1. Desplegar un<br/>chaincode"]
-        C["2. Anadir organizacion<br/>al canal"]
+        C["2. Añadir organización<br/>al canal"]
         D["3. Actualizar config<br/>del canal"]
-        E["4. Monitorizacion<br/>y logs"]
-        F["5. Backup y<br/>recuperacion"]
-        G["6. Rotacion de<br/>certificados"]
+        E["4. Monitorización<br/>y logs"]
+        F["5. Backup y<br/>recuperación"]
+        G["6. Rotación de<br/>certificados"]
     end
 
     A --> B --> C
@@ -35,7 +35,7 @@ graph TB
 
 ## Prerequisitos
 
-Debes haber completado el [doc 05](05-fabric-ca.md) hasta el paso 6 (todas las identidades generadas con Fabric CA). Deberias tener:
+Debes haber completado el [doc 05](05-fabric-ca.md) hasta el paso 7 (todas las identidades generadas con Fabric CA y los MSPs construidos). Deberías tener:
 
 ```
 $HOME/red-con-ca/
@@ -53,7 +53,7 @@ $HOME/red-con-ca/
 
 ## 0. Completar la red: peers, orderer y canal
 
-El doc 05 monto las CAs y genero las identidades. Ahora levantamos los peers y el orderer que usan esos certificados.
+El doc 05 montó las CAs y generó las identidades. Ahora levantamos los peers y el orderer que usan esos certificados, y creamos el canal donde operarán.
 
 ### 0.1 Docker Compose para la red
 
@@ -219,13 +219,20 @@ cd $HOME/red-con-ca
 docker compose -f docker/docker-compose-net.yaml up -d
 ```
 
-Verificar (deberias ver 8 contenedores: 3 CAs + orderer + 2 peers + 2 CouchDB):
+Verificar (deberías ver 8 contenedores: 3 CAs + orderer + 2 peers + 2 CouchDB):
 
 ```bash
 docker ps --format "table {{.Names}}\t{{.Status}}"
 ```
 
 ### 0.3 Crear canal y unir peers
+
+> **Nota sobre `configtx.yaml`**: el doc 05 no genera este archivo (su objetivo es solo Fabric CA y los MSPs). Para generar el bloque génesis necesitas un `configtx.yaml` en `$PWD`. Lo más rápido es copiar el del [doc 03](03-crear-red-personalizada.md) y adaptar **cuatro líneas**:
+>
+> - Los `MSPDir` de cada org: deben apuntar a `organizations/peerOrganizations/orgX.example.com/msp` (la estructura que construiste en el paso 7 del doc 05). Suelen ya estar así.
+> - El nombre del perfil (`TwoOrgsChannel`) y el `channelID` (`mychannel`) son arbitrarios — usa los mismos en `-profile` y `-channelID` aquí abajo.
+>
+> Si te encuentras con errores tipo `could not load MSP configuration: open .../msp/cacerts: no such file or directory`, es porque las rutas del configtx no coinciden con la estructura `organizations/`.
 
 ```bash
 # Variables comunes
@@ -234,7 +241,7 @@ export ORDERER_CA=$PWD/organizations/ordererOrganizations/example.com/orderers/o
 export ORDERER_ADMIN_TLS_CERT=$PWD/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
 export ORDERER_ADMIN_TLS_KEY=$PWD/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
 
-# Generar bloque genesis (necesitas un configtx.yaml — ver doc 03 como referencia)
+# Generar bloque génesis del canal
 configtxgen -profile TwoOrgsChannel \
   -outputBlock channel-artifacts/mychannel.block \
   -channelID mychannel
@@ -267,11 +274,35 @@ export CORE_PEER_ADDRESS=localhost:9051
 peer channel join -b channel-artifacts/mychannel.block
 ```
 
+### 0.4 Verificar que la red está bien arrancada
+
+Antes de seguir, comprueba estas tres cosas:
+
+```bash
+# 1. El orderer está en el canal
+osnadmin channel list \
+  -o localhost:7053 \
+  --ca-file $ORDERER_CA \
+  --client-cert $ORDERER_ADMIN_TLS_CERT \
+  --client-key $ORDERER_ADMIN_TLS_KEY
+# Esperado: ve "mychannel" en la lista con status "active"
+
+# 2. El peer ve el canal (ejecuta esto con las env vars de la org que sea)
+peer channel list
+# Esperado: ve "mychannel" en "Channels peers has joined"
+
+# 3. Altura de la cadena (bloque génesis = 1)
+peer channel getinfo -c mychannel
+# Esperado: height: 1, hash y previous_block_hash poblados
+```
+
+Si las tres salen sin error, la red está operativa y lista para el resto del documento.
+
 ---
 
 ## 1. Desplegar un chaincode
 
-> **¿Qué es?** Es el proceso por el que se publica un nuevo smart contract (chaincode) en un canal de Fabric. Sigue un lifecycle de 4 pasos: empaquetar el código, instalarlo en cada peer, aprobar la definición desde cada org y, finalmente, hacer commit en el canal.
+> **¿Qué es?** Es el proceso por el que se pública un nuevo smart contract (chaincode) en un canal de Fabric. Sigue un lifecycle de 4 pasos: empaquetar el código, instalarlo en cada peer, aprobar la definición desde cada org y, finalmente, hacer commit en el canal.
 >
 > **¿Para qué sirve?** Para que la red empiece a procesar transacciones sobre una nueva lógica de negocio. Sin chaincode desplegado el canal está vacío — los peers no tienen reglas que aplicar.
 >
@@ -394,7 +425,7 @@ peer chaincode query -C mychannel -n basic \
   -c '{"Args":["GetAllAssets"]}'
 ```
 
-Si ves una lista de activos en JSON, la red esta operativa y el chaincode funciona. Ya podemos practicar las operaciones de administracion.
+Si ves una lista de activos en JSON, la red está operativa y el chaincode funciona. Ya podemos practicar las operaciones de administración.
 
 ---
 
@@ -406,7 +437,7 @@ Si ves una lista de activos en JSON, la red esta operativa y el chaincode funcio
 >
 > **¿Cuándo hacerlo?** Cuando un nuevo socio quiere unirse al consorcio (por ejemplo, una tercera empresa que se suma al programa de fidelización) o cuando se crea una organización nueva dentro de un mismo grupo empresarial (filial, división, joint venture). Es una operación que **requiere consenso** entre las orgs existentes — no se puede hacer unilateralmente. Suele coordinarse en una reunión de gobernanza del consorcio.
 
-Esta es una de las operaciones mas complejas en Fabric. Un nuevo socio se une al consorcio y necesita participar en un canal existente.
+Esta es una de las operaciones más complejas en Fabric. Un nuevo socio se une al consorcio y necesita participar en un canal existente.
 
 ### Flujo general
 
@@ -417,26 +448,53 @@ sequenceDiagram
     participant Orderer as Orderer
     participant Canal as Canal
 
-    Note over NewOrg: 1. Preparar material criptografico
+    Note over NewOrg: 1. Preparar material criptográfico
     NewOrg->>NewOrg: Generar certs con Fabric CA
     NewOrg->>Admin: Entregar MSP de Org3
 
     Note over Admin,Orderer: 2. Actualizar config del canal
     Admin->>Orderer: Fetch config actual
-    Admin->>Admin: Anadir Org3 al JSON de config
+    Admin->>Admin: Añadir Org3 al JSON de config
     Admin->>Admin: Calcular delta (config update)
     Admin->>Orderer: Enviar config update firmada
 
     Note over NewOrg,Canal: 3. Unir peer al canal
-    NewOrg->>Orderer: Obtener bloque genesis
+    NewOrg->>Orderer: Obtener bloque génesis
     NewOrg->>Canal: peer channel join
 ```
 
 ### Paso a paso
 
-#### 2.1 Generar identidades de la nueva org con Fabric CA
+#### 2.1 Levantar la CA de Org3 y generar sus identidades
 
-Levantar una CA para Org3 (añadir al docker-compose-ca.yaml o crear uno nuevo):
+Primero, añade un servicio nuevo al `docker-compose-ca.yaml` para la CA de Org3 (puerto **10054**):
+
+```yaml
+  ca.org3.example.com:
+    container_name: ca.org3.example.com
+    image: hyperledger/fabric-ca:1.5
+    environment:
+      - FABRIC_CA_HOME=/etc/hyperledger/fabric-ca-server
+      - FABRIC_CA_SERVER_CA_NAME=ca-org3
+      - FABRIC_CA_SERVER_TLS_ENABLED=true
+      - FABRIC_CA_SERVER_PORT=10054
+    ports:
+      - 10054:10054
+    command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+    volumes:
+      - ../fabric-ca/org3:/etc/hyperledger/fabric-ca-server
+    networks:
+      - fabric-ca-net
+```
+
+Levanta solo el contenedor nuevo:
+
+```bash
+mkdir -p fabric-ca/org3
+docker compose -f docker/docker-compose-ca.yaml up -d ca.org3.example.com
+```
+
+Una vez arrancada la CA, repite el ciclo register + enroll del [doc 05](05-fabric-ca.md):
 
 ```bash
 # Enrollar admin bootstrap de Org3
@@ -446,7 +504,7 @@ fabric-ca-client enroll \
   --caname ca-org3 \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
 
-# Registrar y enrollar peer de Org3
+# Registrar y enrollar peer de Org3 (identidad MSP)
 fabric-ca-client register --caname ca-org3 \
   --id.name peer0 --id.secret peer0pw --id.type peer \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
@@ -458,12 +516,32 @@ fabric-ca-client enroll \
   --csr.hosts peer0.org3.example.com,localhost \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
 
-# Construir MSP de Org3 (misma estructura que Org1/Org2)
+# Enrollar peer de Org3 (identidad TLS)
+export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org3/peer0/tls
+fabric-ca-client enroll \
+  -u https://peer0:peer0pw@localhost:10054 \
+  --caname ca-org3 \
+  --enrollment.profile tls \
+  --csr.hosts peer0.org3.example.com,localhost \
+  --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
+
+# Registrar y enrollar el admin de Org3
+fabric-ca-client register --caname ca-org3 \
+  --id.name org3admin --id.secret org3adminpw --id.type admin \
+  --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
+
+export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org3/org3admin
+fabric-ca-client enroll \
+  -u https://org3admin:org3adminpw@localhost:10054 \
+  --caname ca-org3 \
+  --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
 ```
+
+Construye después el MSP de Org3 siguiendo exactamente la misma estructura del paso 7 del [doc 05](05-fabric-ca.md) (en `organizations/peerOrganizations/org3.example.com/`).
 
 #### 2.2 Generar la definición JSON de Org3
 
-Anade Org3 al `configtx.yaml` y genera su definición:
+Añade Org3 al `configtx.yaml` y genera su definición:
 
 ```bash
 export FABRIC_CFG_PATH=$PWD
@@ -533,7 +611,7 @@ configtxlator proto_encode --input channel-artifacts/config_update_envelope.json
 # Org1 firma
 peer channel signconfigtx -f channel-artifacts/config_update_envelope.pb
 
-# Cambiar a Org2 para enviar (su firma se anade automaticamente)
+# Cambiar a Org2 para enviar (su firma se añade automáticamente al enviar)
 export CORE_PEER_LOCALMSPID=Org2MSP
 export CORE_PEER_ADDRESS=localhost:9051
 export CORE_PEER_TLS_ROOTCERT_FILE=$PEER_ORG2_TLS
@@ -545,6 +623,8 @@ peer channel update -f channel-artifacts/config_update_envelope.pb \
   --ordererTLSHostnameOverride orderer.example.com \
   --tls --cafile $ORDERER_CA
 ```
+
+> **¿Y si faltan firmas?** Con `MAJORITY Admins`, en una red de 2 orgs hace falta firma de las dos. Si solo firma una, `peer channel update` devuelve `error: error applying config update to existing channel ... permission denied`. Resuelve recopilando las firmas que falten (ver sección 3.6 más abajo).
 
 #### 2.7 Unir el peer de Org3
 
@@ -565,7 +645,64 @@ peer channel fetch 0 channel-artifacts/mychannel.block \
 peer channel join -b channel-artifacts/mychannel.block
 ```
 
-> **Nota:** Este proceso es complejo a proposito. Fabric requiere gobernanza: no puedes añadir una org sin el consentimiento de las existentes. Es una caracteristica, no un defecto.
+#### 2.8 Verificar que Org3 está activa en el canal
+
+Tras unir Org3, deberías ver tres cosas:
+
+```bash
+# 1. La altura del canal ha crecido (al menos +1 por el bloque de config update)
+peer channel getinfo -c mychannel
+# Esperado: height mayor que antes del config update
+
+# 2. Org3 aparece en la lista de organizaciones del canal
+peer channel fetch config /tmp/config_block.pb \
+  -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com \
+  --tls --cafile $ORDERER_CA -c mychannel
+
+configtxlator proto_decode --input /tmp/config_block.pb \
+  --type common.Block | jq '.data.data[0].payload.data.config.channel_group.groups.Application.groups | keys'
+# Esperado: ["Org1MSP", "Org2MSP", "Org3MSP"]
+
+# 3. Desde Org3, puedes hacer queries de solo lectura del chaincode
+export CORE_PEER_LOCALMSPID=Org3MSP
+export CORE_PEER_ADDRESS=localhost:11051
+export CORE_PEER_TLS_ROOTCERT_FILE=$PWD/organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=$PWD/organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com/msp
+
+peer chaincode query -C mychannel -n basic -c '{"Args":["GetAllAssets"]}'
+# Esperado: mismo resultado que desde Org1 u Org2
+```
+
+#### 2.9 ¿Org3 como endorsing peer del chaincode existente?
+
+Unir el peer al canal **no** convierte automáticamente a Org3 en endorsing peer del chaincode `basic`. Para que Org3 pueda endorsar transacciones tienes que **redesplegar el chaincode con sequence + 1** incluyendo a Org3 en las aprobaciones:
+
+```bash
+# 1. Instalar el chaincode en peer0.org3 (mismo .tar.gz que las demás orgs)
+peer lifecycle chaincode install basic.tar.gz
+
+# 2. Aprobar como Org3 con sequence + 1
+peer lifecycle chaincode approveformyorg \
+  -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com \
+  --tls --cafile $ORDERER_CA \
+  --channelID mychannel --name basic --version 1.0 \
+  --package-id $CC_PACKAGE_ID --sequence 2
+
+# 3. Volver a aprobar como Org1 y Org2 con la misma sequence 2
+
+# 4. Hacer commit incluyendo a Org3 en --peerAddresses
+peer lifecycle chaincode commit \
+  -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com \
+  --tls --cafile $ORDERER_CA \
+  --channelID mychannel --name basic --version 1.0 --sequence 2 \
+  --peerAddresses localhost:7051 --tlsRootCertFiles $PEER_ORG1_TLS \
+  --peerAddresses localhost:9051 --tlsRootCertFiles $PEER_ORG2_TLS \
+  --peerAddresses localhost:11051 --tlsRootCertFiles $PEER_ORG3_TLS
+```
+
+Tras el commit, Org3 forma parte de la política de endorsement y puede contribuir a las transacciones.
+
+> **Nota:** este proceso es complejo a propósito. Fabric requiere gobernanza: no puedes añadir una org sin el consentimiento de las existentes. Es una característica, no un defecto.
 
 ---
 
@@ -584,20 +721,20 @@ peer channel join -b channel-artifacts/mychannel.block
 >
 > Como toda modificación del canal, requiere mayoría de admins firmando la propuesta.
 
-### Que se puede cambiar
+### Qué se puede cambiar
 
-| Parametro | Donde | Ejemplo |
+| Parámetro | Dónde | Ejemplo |
 |-----------|-------|---------|
-| Batch timeout | Orderer | Cambiar de 2s a 1s para mas velocidad |
+| Batch timeout | Orderer | Cambiar de 2 s a 1 s para más velocidad |
 | Batch size | Orderer | Aumentar MaxMessageCount de 10 a 50 |
-| Políticas | Canal/Application/Orderer | Cambiar MAJORITY a ALL |
+| Políticas | Channel/Application/Orderer | Cambiar MAJORITY a ALL |
 | Anchor peers | Application.groups.OrgX | Añadir o cambiar anchor peers |
 | ACLs | Application | Cambiar permisos de acceso a recursos |
-| Capabilities | Canal/Orderer/Application | Habilitar nuevas features de Fabric |
+| Capabilities | Channel/Orderer/Application | Habilitar nuevas features de Fabric |
 
 ### Proceso general
 
-El patron es siempre el mismo (fetch → decode → modify → compute → submit):
+El patrón es siempre el mismo (fetch → decode → modify → compute → submit):
 
 ```mermaid
 graph LR
@@ -666,6 +803,55 @@ peer channel update -f channel-artifacts/config_update_envelope.pb \
   --tls --cafile $ORDERER_CA
 ```
 
+### Otros ejemplos comunes
+
+El patrón anterior (fetch → decode → modify → compute → submit) es siempre el mismo; lo único que cambia es el `jq` del paso 3. Aquí van los más pedidos en la práctica:
+
+**Cambiar anchor peers de Org1** (los peers que actúan como puntos de descubrimiento entre orgs):
+
+```bash
+jq '.channel_group.groups.Application.groups.Org1MSP.values.AnchorPeers = {
+  "mod_policy": "Admins",
+  "value": {
+    "anchor_peers": [{"host": "peer0.org1.example.com", "port": 7051}]
+  },
+  "version": "0"
+}' channel-artifacts/config.json > channel-artifacts/config_modified.json
+```
+
+**Cambiar la política de endorsement por defecto del canal** (de `MAJORITY` a `ALL`):
+
+```bash
+jq '.channel_group.groups.Application.policies.Endorsement.policy.value.rule = "ALL"' \
+  channel-artifacts/config.json > channel-artifacts/config_modified.json
+```
+
+**Habilitar capabilities V2_5** (cuando todas las orgs ya corren Fabric 2.5):
+
+```bash
+jq '.channel_group.values.Capabilities.value.capabilities = {"V2_5": {}}' \
+  channel-artifacts/config.json > channel-artifacts/config_modified.json
+```
+
+> **Importante**: las capabilities solo se pueden subir cuando **todas** las orgs corren la versión correspondiente. Si alguna está aún en una versión anterior, no podrá procesar bloques con la nueva capability y se quedará desincronizada.
+
+### 3.6 Recopilar firmas de múltiples orgs
+
+Cuando la política exige `MAJORITY Admins` y tienes más de una org, el flujo es:
+
+1. Org1 firma el envelope con `peer channel signconfigtx -f config_update_envelope.pb`.
+2. Org1 entrega el `.pb` firmado a Org2 (email seguro, repo privado, lo que sea).
+3. Org2 firma sobre el mismo archivo: `peer channel signconfigtx -f config_update_envelope.pb`.
+4. Cualquiera de las dos envía la versión ya firmada por ambas con `peer channel update`.
+
+Si solo cuentas con una firma y la política requiere dos, el orderer rechaza el envelope:
+
+```
+Error: error applying config update to existing channel: ... permission denied
+```
+
+Si lo ves, comprueba con `mod_policy` qué políticas se aplican al campo que modificaste (suele estar en `.mod_policy` de cada grupo o valor del JSON) y recopila las firmas que falten.
+
 ---
 
 ## 4. Monitorización y logs
@@ -687,12 +873,22 @@ peer channel update -f channel-artifacts/config_update_envelope.pb \
 docker logs -f peer0.org1.example.com
 docker logs -f orderer.example.com
 
-# Ultimas 100 lineas
+# Últimas 100 líneas
 docker logs --tail 100 peer0.org1.example.com
 
 # Filtrar por nivel
 docker logs peer0.org1.example.com 2>&1 | grep -i error
 ```
+
+> **Ojo con los logs del chaincode**: el código del smart contract no corre dentro del contenedor del peer. Cuando un peer instancia un chaincode, lanza otro contenedor aparte llamado `dev-peer0.<orgX>.example.com-<label>-<hash>`. Los `fmt.Println` o `console.log` del chaincode salen ahí, no en el log del peer.
+>
+> ```bash
+> # Listar los contenedores de chaincode
+> docker ps --format '{{.Names}}' | grep '^dev-'
+>
+> # Ver sus logs (sustituye el nombre por el real)
+> docker logs -f dev-peer0.org1.example.com-basic_1.0-abc123...
+> ```
 
 ### Niveles de log
 
@@ -700,8 +896,8 @@ Se controlan con la variable `FABRIC_LOGGING_SPEC`:
 
 ```bash
 # En docker-compose: FABRIC_LOGGING_SPEC=INFO
-# Mas detalle:       FABRIC_LOGGING_SPEC=DEBUG
-# Solo un modulo:    FABRIC_LOGGING_SPEC=INFO:gossip=DEBUG:msp=DEBUG
+# Más detalle:       FABRIC_LOGGING_SPEC=DEBUG
+# Solo un módulo:    FABRIC_LOGGING_SPEC=INFO:gossip=DEBUG:msp=DEBUG
 
 # Cambiar en caliente (sin reiniciar el contenedor)
 docker exec peer0.org1.example.com \
@@ -713,11 +909,21 @@ docker exec peer0.org1.example.com \
 | `ERROR` | Producción (solo errores críticos) |
 | `WARNING` | Producción (errores + advertencias) |
 | `INFO` | Normal (operaciones principales) |
-| `DEBUG` | Diagnostico (muy verboso, solo temporal) |
+| `DEBUG` | Diagnóstico (muy verboso, solo temporal) |
 
 ### Métricas con Operations API
 
-Los peers y el orderer exponen métricas en sus puertos de operaciones (configurados en el docker-compose):
+Los peers y el orderer exponen un endpoint HTTP de operaciones con health checks y métricas en formato Prometheus. **No está activo por defecto**: hay que declararlo en el docker-compose con las env vars adecuadas (el docker-compose de la sección 0 ya lo tiene):
+
+```yaml
+# Para el peer
+- CORE_OPERATIONS_LISTENADDRESS=peer0.org1.example.com:9444
+
+# Para el orderer
+- ORDERER_OPERATIONS_LISTENADDRESS=orderer.example.com:9443
+```
+
+Con esas variables, los puertos `9443` (orderer), `9444` (Org1) y `9445` (Org2) escuchan HTTP:
 
 ```bash
 # Health check del peer Org1 (puerto 9444)
@@ -726,13 +932,13 @@ curl -s http://localhost:9444/healthz
 # Health check del orderer (puerto 9443)
 curl -s http://localhost:9443/healthz
 
-# Metricas en formato Prometheus
+# Métricas en formato Prometheus
 curl -s http://localhost:9444/metrics | head -20
 ```
 
 Métricas útiles:
 
-| Métrica | Que indica |
+| Métrica | Qué indica |
 |---------|-----------|
 | `endorser_proposal_duration` | Tiempo de endorsement |
 | `ledger_block_processing_time` | Tiempo de procesado de bloque |
@@ -752,9 +958,21 @@ graph LR
 
 > En producción se configura Prometheus para recolectar métricas y Grafana para visualizarlas.
 
+### Eventos del chaincode (chaincode events)
+
+Otra fuente de información operativa son los **eventos** que emite el chaincode. Un chaincode puede llamar a `ctx.GetStub().SetEvent("EventName", payload)` para señalizar que ha pasado algo importante (`AssetCreated`, `TransferConfirmed`, etc). Estos eventos viajan en el bloque junto con la transacción.
+
+Casos de uso típicos:
+
+- **Disparar workflows externos**: un sistema legacy escucha `AssetCreated` y reacciona.
+- **Auditoría en tiempo real**: una herramienta consume todos los eventos del canal y alimenta un dashboard.
+- **Notificaciones**: una app cliente avisa al usuario cuando se confirma una transacción suya.
+
+Para escucharlos desde un cliente Node.js o Go basta con suscribirse al stream de eventos del canal mediante el Gateway SDK. Lo vemos con más detalle en el [doc 05 del Módulo 6](../Modulo%206/05-aplicacion-cliente.md).
+
 ---
 
-## 5. Backup y recuperacion
+## 5. Backup y recuperación
 
 > **¿Qué es?** Es la práctica de copiar periódicamente los datos críticos de la red (claves privadas, certificados, ledger, world state, base de datos de la CA, configuración) a un almacenamiento separado, junto con el procedimiento para restaurarlos cuando algo falla.
 >
@@ -769,14 +987,14 @@ graph LR
 >
 > En multi-máquina, **cada org backupea sus propios datos**. No hay backup centralizado — cada participante es responsable de su infraestructura.
 
-### Que hay que respaldar
+### Qué hay que respaldar
 
 ```mermaid
 graph TB
-    subgraph "Datos criticos a respaldar"
+    subgraph "Datos críticos a respaldar"
         A["Ledger<br/>(bloques + world state)"]
-        B["Material criptografico<br/>(certs + claves)"]
-        C["Configuracion<br/>(yaml, docker-compose)"]
+        B["Material criptográfico<br/>(certs + claves)"]
+        C["Configuración<br/>(yaml, docker-compose)"]
     end
 
     A --> |"Volumen Docker:<br/>/var/hyperledger/production"| BA["Backup del volumen"]
@@ -788,36 +1006,70 @@ graph TB
     style C fill:#B45D09,color:#fff
 ```
 
-| Que | Donde esta | Frecuencia | Criticidad |
+| Qué | Dónde está | Frecuencia | Criticidad |
 |-----|-----------|-----------|------------|
-| **Claves privadas** | `organizations/*/keystore/` y `fabric-ca/*/` | Una vez (no cambian) | **CRITICA** |
+| **Claves privadas** | `organizations/*/keystore/` y `fabric-ca/*/` | Una vez (no cambian) | **CRÍTICA** |
 | **Certificados** | `organizations/*/signcerts/` | Al renovar | Alta |
-| **Ledger** | Volumen Docker del peer | Periodica | Alta (se reconstruye desde otros peers) |
-| **World State** | Volumen Docker (CouchDB) | Periodica | Media (se reconstruye desde bloques) |
+| **Ledger** | Volumen Docker del peer | Periódica | Alta (se reconstruye desde otros peers) |
+| **World State** | Volumen Docker (CouchDB) | Periódica | Media (se reconstruye desde bloques) |
 | **Configuración** | Archivos yaml | En cada cambio | Alta (tener en git) |
-| **Fabric CA database** | `fabric-ca/*/fabric-ca-server.db` | Periodica | **CRITICA** (registro de identidades) |
+| **Fabric CA database** | `fabric-ca/*/fabric-ca-server.db` | Periódica | **CRÍTICA** (registro de identidades) |
 
-### Backup del ledger
+### Backup del ledger del peer
 
 ```bash
-# Opcion A: parar y copiar
+# Opción A: parar y copiar (lo más seguro)
 docker stop peer0.org1.example.com
 docker cp peer0.org1.example.com:/var/hyperledger/production ./backup-peer0-org1
 docker start peer0.org1.example.com
 
-# Opcion B: snapshot sin parar (Fabric 2.5+)
+# Opción B: snapshot sin parar (Fabric 2.5+)
 peer snapshot submitrequest \
   -c mychannel \
   --peerAddress localhost:7051 \
   --tlsRootCertFiles $PEER_ORG1_TLS
+
+# Una vez completado el snapshot, se guarda en el volumen del peer en
+# /var/hyperledger/production/snapshots/. Cópialo a un sitio seguro:
+docker cp peer0.org1.example.com:/var/hyperledger/production/snapshots ./backup-snapshots-org1
 ```
 
-### Recuperacion
+### Backup del world state (CouchDB)
+
+CouchDB se reconstruye desde los bloques, pero si tu canal tiene millones de transacciones eso lleva horas. Conviene respaldarlo aparte:
+
+```bash
+# Volcado de todas las bases de datos del CouchDB de Org1
+mkdir -p backup-couchdb-org1
+for db in $(curl -s http://admin:adminpw@localhost:5984/_all_dbs | jq -r '.[]'); do
+    curl -s http://admin:adminpw@localhost:5984/$db/_all_docs?include_docs=true \
+        > backup-couchdb-org1/$db.json
+done
+```
+
+### Backup de la base de datos de Fabric CA
+
+Cada Fabric CA mantiene un SQLite local con todas las identidades emitidas y revocadas. Es crítico para la auditoría:
+
+```bash
+# Parar la CA brevemente para que SQLite cierre el fichero
+docker stop ca.org1.example.com
+
+# Copiar la BD y los archivos asociados
+cp -r fabric-ca/org1 ./backup-ca-org1
+
+# Volver a arrancar
+docker start ca.org1.example.com
+```
+
+> **Alternativa sin downtime**: ejecutar `sqlite3 fabric-ca/org1/fabric-ca-server.db ".backup '/tmp/ca-backup.db'"` mientras la CA está corriendo. Funciona porque SQLite soporta backups online a través de su API.
+
+### Recuperación
 
 ```mermaid
 graph TB
-    LOST["Peer perdido"] --> A["Opcion A:<br/>Restaurar backup"]
-    LOST --> B["Opcion B:<br/>Unirse desde cero"]
+    LOST["Peer perdido"] --> A["Opción A:<br/>Restaurar backup"]
+    LOST --> B["Opción B:<br/>Unirse desde cero"]
 
     A --> A1["Restaurar volumen → arrancar → sincroniza bloques faltantes"]
     B --> B1["Arrancar limpio → peer channel join → descarga TODO"]
@@ -825,6 +1077,65 @@ graph TB
     style A fill:#0D9448,color:#fff
     style B fill:#B45D09,color:#fff
 ```
+
+#### Opción A: restaurar desde backup
+
+```bash
+# 1. Parar el peer (si aún está arrancado con datos corruptos)
+docker stop peer0.org1.example.com
+docker rm peer0.org1.example.com
+
+# 2. Restaurar el volumen Docker desde el backup
+docker volume rm red-con-ca_peer0.org1.example.com 2>/dev/null || true
+docker volume create red-con-ca_peer0.org1.example.com
+
+# Copiar el contenido del backup dentro del volumen
+docker run --rm -v red-con-ca_peer0.org1.example.com:/dst \
+  -v "$PWD/backup-peer0-org1:/src" alpine \
+  sh -c 'cp -a /src/. /dst/'
+
+# 3. Volver a arrancar
+docker compose -f docker/docker-compose-net.yaml up -d peer0.org1.example.com
+
+# 4. Verificar que recupera la altura del canal
+peer channel getinfo -c mychannel
+```
+
+El peer detectará que falta historia respecto al orderer y se sincronizará automáticamente.
+
+#### Opción B: arrancar limpio y resincronizar
+
+Útil si **no tienes backup** o si la corrupción es total. Solo necesitas tener los **certificados y claves** (lo más crítico). El ledger se reconstruye desde el orderer y los otros peers:
+
+```bash
+# 1. Asegúrate de tener intacto el material crypto en organizations/peerOrganizations/org1.example.com/
+ls organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp
+
+# 2. Borrar el volumen viejo
+docker stop peer0.org1.example.com 2>/dev/null
+docker rm peer0.org1.example.com 2>/dev/null
+docker volume rm red-con-ca_peer0.org1.example.com
+
+# 3. Arrancar el peer limpio
+docker compose -f docker/docker-compose-net.yaml up -d peer0.org1.example.com
+
+# 4. Unir al canal de nuevo (descargará todos los bloques desde el principio)
+export CORE_PEER_LOCALMSPID=Org1MSP
+export CORE_PEER_ADDRESS=localhost:7051
+export CORE_PEER_TLS_ROOTCERT_FILE=$PEER_ORG1_TLS
+export CORE_PEER_MSPCONFIGPATH=$PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+
+# Obtener bloque génesis del canal
+peer channel fetch 0 channel-artifacts/mychannel.block \
+  -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com \
+  --tls --cafile $ORDERER_CA -c mychannel
+
+peer channel join -b channel-artifacts/mychannel.block
+
+# El peer descargará todo el historial del canal. En canales grandes tarda.
+```
+
+> **Caso "lo he perdido todo"**: si pierdes incluso las claves privadas (carpeta `organizations/` borrada y sin backup), no puedes recuperar la identidad de la org. Tendrías que coordinarte con las otras orgs para emitir certificados nuevos y añadir la org otra vez como si fuera nueva (sección 2). El historial del canal sigue intacto en las otras orgs.
 
 ---
 
@@ -866,18 +1177,78 @@ docker restart peer0.org1.example.com
 peer channel list
 ```
 
+### Rotación de certificados de enrollment (no TLS)
+
+A diferencia del TLS, los certificados de **enrollment** (los que firman transacciones) no requieren reiniciar el peer — son los que usan los clientes y administradores al firmar. Su rotación es más sencilla:
+
+```bash
+# Reenrollar al usuario user1 (cliente)
+export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org1/user1
+
+fabric-ca-client reenroll \
+  --caname ca-org1 \
+  --enrollment.attrs "role,department" \
+  --tls.certfiles $PWD/fabric-ca/org1/tls-cert.pem
+
+# El nuevo cert se escribe en $FABRIC_CA_CLIENT_HOME/msp/signcerts/
+# La nueva clave privada en $FABRIC_CA_CLIENT_HOME/msp/keystore/
+```
+
+A partir de ese momento, las aplicaciones cliente que carguen ese MSP usarán el nuevo cert. **No hace falta reiniciar nada del lado del peer**: la próxima transacción que llegue firmada con el nuevo cert se valida normalmente porque está firmado por la misma CA.
+
+### Rotación del cert del admin de la org
+
+Este caso merece atención aparte porque si caduca, **nadie puede ejecutar operaciones administrativas** sobre el canal (commit de chaincode, config updates, etc).
+
+```bash
+# Reenrollar el admin de Org1
+export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org1/org1admin
+
+fabric-ca-client reenroll \
+  --caname ca-org1 \
+  --tls.certfiles $PWD/fabric-ca/org1/tls-cert.pem
+
+# Copiar el nuevo cert y la nueva clave al MSP del admin
+cp $FABRIC_CA_CLIENT_HOME/msp/signcerts/cert.pem \
+   $PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/
+
+cp $FABRIC_CA_CLIENT_HOME/msp/keystore/*_sk \
+   $PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/
+
+# Borrar el viejo (si quedó duplicado)
+ls $PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/
+```
+
+> **Recomendación**: vigila la caducidad del admin con `openssl x509 -in cert.pem -noout -enddate` y rota con al menos 60 días de margen. Si caduca antes de rotarlo, no hay forma de operar el canal hasta emitir uno nuevo (que requiere otro admin, lo cual puede ser un círculo vicioso si solo había uno).
+
+### Rotación coordinada en clúster Raft del orderer
+
+Cuando hay varios nodos orderer formando un clúster Raft, la rotación de su certificado TLS exige coordinación: el cluster ID de cada nodo está atado a su cert, así que cambiar uno implica actualizar la configuración del canal antes de reiniciar.
+
+Procedimiento resumido (cada nodo del clúster, uno a uno):
+
+1. Reenrollar el cert TLS del nodo con `fabric-ca-client reenroll --enrollment.profile tls`.
+2. **Antes de reiniciar el nodo**, actualizar la config del canal para sustituir el cert antiguo del consenter por el nuevo (sección 3, modificando `.channel_group.values.OrdererAddresses` y el `consenters` del config).
+3. Esperar a que la config update se commitee.
+4. Reiniciar el nodo orderer con el cert nuevo.
+5. Verificar que sigue en el clúster: `osnadmin channel list` desde otro nodo.
+6. Repetir con el siguiente nodo.
+
+> **Importante**: no rotar nunca dos nodos a la vez si el clúster tiene 3 nodos. Perderías quórum. En clústers de 5, puedes rotar de dos en dos.
+
 ### Calendario de rotación
 
 | Componente | Frecuencia | Impacto |
 |-----------|-----------|---------|
 | TLS de peers | Cada 12 meses | Reinicio del peer (segundos) |
-| TLS de orderers | Cada 12 meses | Coordinar con cluster Raft |
-| Enrollment certs | Según política | Sin reinicio |
-| CA root cert | Cada 5-10 años | Renovación completa |
+| TLS de orderers | Cada 12 meses | Coordinar con clúster Raft (uno a uno) |
+| Enrollment certs (clientes) | Según política, anual típicamente | Sin reinicio |
+| Cert del admin de la org | Antes de caducidad, margen ≥ 60 días | Sin reinicio, solo copia al MSP |
+| CA root cert | Cada 5-10 años | Renovación completa de la cadena |
 
 ---
 
-## Resumen de comandos de administracion
+## Resumen de comandos de administración
 
 | Operación | Comando |
 |-----------|---------|
