@@ -145,18 +145,48 @@ Si los puntos 1 y 2 dicen `✓ ... limpio` y los 3 y 4 listan las CAs + la red, 
 > rm -f $HOME/red-con-ca/configtx.yaml
 > ```
 >
-> **No borres `docker-compose-ca.yaml`** — las CAs lo están usando ahora mismo. Si crees que está dañado, primero baja las CAs (`docker compose -f docker/docker-compose-ca.yaml down`, **sin `-v`** para no perder identidades), corrige el yaml, y vuelve a levantarlas.
-
-> **¿Quieres rehacer también el doc 05 (CAs e identidades)?** Solo hazlo si las identidades quedaron corruptas o quieres practicar el doc 05 entero otra vez. Para ello primero baja las CAs con `-v` y luego borra las carpetas:
+> **No borres `docker-compose-ca.yaml`** — las CAs lo están usando ahora mismo. Si crees que está dañado:
 >
 > ```bash
 > cd $HOME/red-con-ca
+>
+> # 1. Bajar las CAs SIN -v (no toca las identidades de fabric-ca/)
+> docker compose -f docker/docker-compose-ca.yaml down
+>
+> # 2. Editar / recrear docker/docker-compose-ca.yaml manualmente
+> #    (usa el del paso 2 del doc 05 como referencia)
+>
+> # 3. Volver a levantar las CAs (las identidades persisten en fabric-ca/)
+> docker compose -f docker/docker-compose-ca.yaml up -d
+>
+> # 4. Verificar
+> docker ps --format "{{.Names}}\t{{.Status}}" | grep -E "^ca\\."
+> ```
+
+> **¿Quieres rehacer también el doc 05 desde cero (CAs e identidades nuevas)?** Solo hazlo si las identidades quedaron corruptas o quieres practicar el doc 05 entero otra vez:
+>
+> ```bash
+> cd $HOME/red-con-ca
+>
+> # 1. Bajar TODO incluyendo CAs, esta vez con -v para borrar también la red
 > docker compose -f docker/docker-compose-ca.yaml down -v
-> docker network rm fabric-ca-net
+> docker network rm fabric-ca-net 2>/dev/null || true
+>
+> # 2. Borrar identidades y MSPs construidos (lo que el doc 05 generó)
 > rm -rf fabric-ca organizations
+> mkdir -p fabric-ca/org1 fabric-ca/org2 fabric-ca/orderer
 > ```
 >
-> Tendrás que rehacer el doc 05 completo antes de continuar aquí. **Lo habitual es NO borrar nada de esto** y reutilizar lo que el doc 05 generó.
+> A partir de aquí debes **rehacer el doc 05 completo**, en orden:
+>
+> 1. **Doc 05 paso 2**: levantar las 3 CAs (`docker compose -f docker/docker-compose-ca.yaml up -d`). La red `fabric-ca-net` se recrea automáticamente.
+> 2. **Doc 05 paso 3**: enrolar al admin bootstrap de cada CA.
+> 3. **Doc 05 paso 4**: registrar las identidades de Org1.
+> 4. **Doc 05 paso 5**: enrolar las identidades de Org1.
+> 5. **Doc 05 paso 6**: repetir para Org2 y OrdererOrg.
+> 6. **Doc 05 paso 7**: construir la estructura MSP.
+>
+> Cuando termines el paso 7 del doc 05, vuelve aquí al **0.1** para seguir con la red. **Lo habitual es NO hacer esto** y reutilizar lo que ya generaste en su día.
 
 ### 0.1 Docker Compose para la red
 
