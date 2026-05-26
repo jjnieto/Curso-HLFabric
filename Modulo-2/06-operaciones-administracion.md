@@ -758,7 +758,11 @@ sequenceDiagram
 
 #### 2.1 Levantar la CA de Org3 y generar sus identidades
 
-Primero, añade un servicio nuevo al `docker-compose-ca.yaml` para la CA de Org3 (puerto **10054**):
+Esta sub-sección replica para Org3 el mismo patrón que el doc 05 hizo para Org1/Org2 (pasos 2 a 7). Sigue los sub-pasos en orden — entre uno y otro **el `FABRIC_CA_CLIENT_HOME` cambia** y eso determina qué identidad está operando.
+
+##### 2.1.1 Definir el servicio ca.org3 y levantar la CA
+
+Añade este servicio al `docker-compose-ca.yaml` (bajo `services:`):
 
 ```yaml
   ca.org3.example.com:
@@ -778,110 +782,175 @@ Primero, añade un servicio nuevo al `docker-compose-ca.yaml` para la CA de Org3
       - fabric-ca-net
 ```
 
-Levanta solo el contenedor nuevo:
+Crea la carpeta de bind-mount y arranca **solo** la CA nueva:
 
 ```bash
+cd $HOME/red-con-ca
 mkdir -p fabric-ca/org3
 docker compose -f docker/docker-compose-ca.yaml up -d ca.org3.example.com
+
+# Esperar a que la CA arranque y genere su tls-cert.pem
+sleep 5
+ls fabric-ca/org3/tls-cert.pem   # debe existir; si no, espera unos segundos más
 ```
 
-Una vez arrancada la CA, repite el ciclo register + enroll del [doc 05](05-fabric-ca.md):
+> El `tls-cert.pem` lo genera la propia CA al arrancar (lo escribe en su bind-mount). Si no aparece, mira los logs: `docker logs ca.org3.example.com`.
+
+##### 2.1.2 Enrolar al admin bootstrap de Org3
 
 ```bash
-# Enrollar admin bootstrap de Org3
 export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org3/admin
+
 fabric-ca-client enroll \
   -u https://admin:adminpw@localhost:10054 \
   --caname ca-org3 \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
+```
 
-# Registrar y enrollar peer de Org3 (identidad MSP)
-fabric-ca-client register --caname ca-org3 \
+A partir de aquí, mientras `FABRIC_CA_CLIENT_HOME` apunte a `fabric-ca/org3/admin`, los comandos `fabric-ca-client` se ejecutan **como admin bootstrap de Org3** — el único que puede registrar nuevas identidades.
+
+##### 2.1.3 Como admin, registrar peer0 y org3admin
+
+**Importante**: NO cambies `FABRIC_CA_CLIENT_HOME` antes de hacer los `register`. Tienes que seguir operando como admin bootstrap. Si pasas a otro contexto (por ejemplo después de un enroll), los `register` fallarán porque la identidad activa ya no tendrá autoridad.
+
+```bash
+# Aún como admin bootstrap (FABRIC_CA_CLIENT_HOME = fabric-ca/org3/admin)
+
+fabric-ca-client register \
+  --caname ca-org3 \
   --id.name peer0 --id.secret peer0pw --id.type peer \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
 
+fabric-ca-client register \
+  --caname ca-org3 \
+  --id.name org3admin --id.secret org3adminpw --id.type admin \
+  --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
+```
+
+Verifica que los dos quedan registrados:
+
+```bash
+fabric-ca-client identity list \
+  --caname ca-org3 \
+  --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
+# Esperado: admin, peer0, org3admin
+```
+
+##### 2.1.4 Enrolar el peer (identidad MSP)
+
+Ahora SÍ cambiamos de contexto para "ser" peer0:
+
+```bash
 export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org3/peer0
+
 fabric-ca-client enroll \
   -u https://peer0:peer0pw@localhost:10054 \
   --caname ca-org3 \
   --csr.hosts peer0.org3.example.com,localhost \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
+```
 
-# Enrollar peer de Org3 (identidad TLS)
+Esto crea `fabric-ca/org3/peer0/msp/` con `cacerts/`, `keystore/`, `signcerts/` y `tlscacerts/`.
+
+##### 2.1.5 Enrolar el peer (identidad TLS)
+
+El peer necesita una segunda identidad para las conexiones gRPC. Misma CA, pero con `--enrollment.profile tls`:
+
+```bash
 export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org3/peer0/tls
+
 fabric-ca-client enroll \
   -u https://peer0:peer0pw@localhost:10054 \
   --caname ca-org3 \
   --enrollment.profile tls \
   --csr.hosts peer0.org3.example.com,localhost \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
+```
 
-# Registrar y enrollar el admin de Org3
-fabric-ca-client register --caname ca-org3 \
-  --id.name org3admin --id.secret org3adminpw --id.type admin \
-  --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
+##### 2.1.6 Enrolar al admin de la org (org3admin)
 
+```bash
 export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org3/org3admin
+
 fabric-ca-client enroll \
   -u https://org3admin:org3adminpw@localhost:10054 \
   --caname ca-org3 \
   --tls.certfiles $PWD/fabric-ca/org3/tls-cert.pem
 ```
 
-Construye después el MSP de Org3 con los siguientes comandos (mismo patrón que el paso 7 del doc 05):
+##### 2.1.7 Construir la estructura MSP de Org3
+
+Mismo procedimiento que el paso 7 del doc 05 pero para Org3. Usa `CA_CERT_NAME` dinámico porque el nombre real del fichero del cert raíz depende de la CA (no es `ca-cert.pem`).
 
 ```bash
 cd $HOME/red-con-ca
 
-ORG3_PEER_DIR=organizations/peerOrganizations/org3.example.com/peers/peer0.org3.example.com
-ORG3_ADMIN_DIR=organizations/peerOrganizations/org3.example.com/users/Admin@org3.example.com
-ORG3_MSP_DIR=organizations/peerOrganizations/org3.example.com/msp
+# --- MSP de la org (channel MSP) ---
+ORG3_DIR=$PWD/organizations/peerOrganizations/org3.example.com
+mkdir -p $ORG3_DIR/msp/{cacerts,tlscacerts,admincerts,users}
 
-# Carpetas
-mkdir -p $ORG3_MSP_DIR/{cacerts,tlscacerts}
-mkdir -p $ORG3_PEER_DIR/{msp/{cacerts,tlscacerts,signcerts,keystore},tls}
-mkdir -p $ORG3_ADMIN_DIR/msp/{cacerts,tlscacerts,signcerts,keystore}
+# Cert raíz de la Identity CA (lo trae el enroll del admin)
+cp $PWD/fabric-ca/org3/admin/msp/cacerts/* \
+   $ORG3_DIR/msp/cacerts/
 
-# Cert raíz de la CA en el MSP de la org
-cp fabric-ca/org3/tls-cert.pem $ORG3_MSP_DIR/cacerts/ca-cert.pem
-cp fabric-ca/org3/tls-cert.pem $ORG3_MSP_DIR/tlscacerts/tlsca-cert.pem
+# Cert raíz TLS (en Fabric CA es la misma CA, pero el cert va en otra carpeta)
+cp $PWD/fabric-ca/org3/peer0/tls/msp/tlscacerts/* \
+   $ORG3_DIR/msp/tlscacerts/
 
-# config.yaml de NodeOUs (clasifica admin/peer/client por OU)
-cat > $ORG3_MSP_DIR/config.yaml <<'YAML'
+# config.yaml de NodeOUs (con el nombre real del fichero del cert raíz)
+CA_CERT_NAME=$(ls $ORG3_DIR/msp/cacerts/)
+cat > $ORG3_DIR/msp/config.yaml <<EOF
 NodeOUs:
   Enable: true
   ClientOUIdentifier:
-    Certificate: cacerts/ca-cert.pem
+    Certificate: cacerts/$CA_CERT_NAME
     OrganizationalUnitIdentifier: client
   PeerOUIdentifier:
-    Certificate: cacerts/ca-cert.pem
+    Certificate: cacerts/$CA_CERT_NAME
     OrganizationalUnitIdentifier: peer
   AdminOUIdentifier:
-    Certificate: cacerts/ca-cert.pem
+    Certificate: cacerts/$CA_CERT_NAME
     OrganizationalUnitIdentifier: admin
   OrdererOUIdentifier:
-    Certificate: cacerts/ca-cert.pem
+    Certificate: cacerts/$CA_CERT_NAME
     OrganizationalUnitIdentifier: orderer
-YAML
+EOF
 
-# MSP del peer
-cp fabric-ca/org3/peer0/msp/signcerts/cert.pem  $ORG3_PEER_DIR/msp/signcerts/
-cp fabric-ca/org3/peer0/msp/keystore/*          $ORG3_PEER_DIR/msp/keystore/priv_sk
-cp fabric-ca/org3/tls-cert.pem                  $ORG3_PEER_DIR/msp/cacerts/ca-cert.pem
-cp fabric-ca/org3/tls-cert.pem                  $ORG3_PEER_DIR/msp/tlscacerts/tlsca-cert.pem
-cp $ORG3_MSP_DIR/config.yaml                    $ORG3_PEER_DIR/msp/config.yaml
+# --- MSP local del peer ---
+PEER_DIR=$ORG3_DIR/peers/peer0.org3.example.com
+mkdir -p $PEER_DIR/msp/{cacerts,tlscacerts,keystore,signcerts}
+mkdir -p $PEER_DIR/tls
 
-# TLS del peer (server.crt, server.key, ca.crt) - usamos el enroll TLS
-cp fabric-ca/org3/peer0/tls/msp/signcerts/cert.pem  $ORG3_PEER_DIR/tls/server.crt
-cp fabric-ca/org3/peer0/tls/msp/keystore/*          $ORG3_PEER_DIR/tls/server.key
-cp fabric-ca/org3/tls-cert.pem                      $ORG3_PEER_DIR/tls/ca.crt
+# MSP local: cert + clave del peer + raíces de identidad y TLS
+cp $PWD/fabric-ca/org3/peer0/msp/cacerts/*           $PEER_DIR/msp/cacerts/
+cp $PWD/fabric-ca/org3/peer0/msp/keystore/*          $PEER_DIR/msp/keystore/
+cp $PWD/fabric-ca/org3/peer0/msp/signcerts/*         $PEER_DIR/msp/signcerts/
+cp $PWD/fabric-ca/org3/peer0/tls/msp/tlscacerts/*    $PEER_DIR/msp/tlscacerts/
+cp $ORG3_DIR/msp/config.yaml                          $PEER_DIR/msp/config.yaml
 
-# MSP del admin
-cp fabric-ca/org3/org3admin/msp/signcerts/cert.pem $ORG3_ADMIN_DIR/msp/signcerts/
-cp fabric-ca/org3/org3admin/msp/keystore/*         $ORG3_ADMIN_DIR/msp/keystore/priv_sk
-cp fabric-ca/org3/tls-cert.pem                     $ORG3_ADMIN_DIR/msp/cacerts/ca-cert.pem
-cp fabric-ca/org3/tls-cert.pem                     $ORG3_ADMIN_DIR/msp/tlscacerts/tlsca-cert.pem
-cp $ORG3_MSP_DIR/config.yaml                       $ORG3_ADMIN_DIR/msp/config.yaml
+# TLS del peer (server.crt, server.key, ca.crt)
+cp $PWD/fabric-ca/org3/peer0/tls/msp/tlscacerts/*    $PEER_DIR/tls/ca.crt
+cp $PWD/fabric-ca/org3/peer0/tls/msp/signcerts/*     $PEER_DIR/tls/server.crt
+cp $PWD/fabric-ca/org3/peer0/tls/msp/keystore/*      $PEER_DIR/tls/server.key
+
+# --- MSP local del admin ---
+ADMIN_DIR=$ORG3_DIR/users/Admin@org3.example.com/msp
+mkdir -p $ADMIN_DIR/{cacerts,tlscacerts,keystore,signcerts}
+
+cp $PWD/fabric-ca/org3/org3admin/msp/cacerts/*       $ADMIN_DIR/cacerts/
+cp $PWD/fabric-ca/org3/org3admin/msp/keystore/*      $ADMIN_DIR/keystore/
+cp $PWD/fabric-ca/org3/org3admin/msp/signcerts/*     $ADMIN_DIR/signcerts/
+cp $PWD/fabric-ca/org3/peer0/tls/msp/tlscacerts/*    $ADMIN_DIR/tlscacerts/
+cp $ORG3_DIR/msp/config.yaml                          $ADMIN_DIR/config.yaml
+```
+
+Verifica que el cert del peer lleva el OU `peer` (si no, NodeOUs no estará bien y Fabric no clasificará bien la identidad):
+
+```bash
+openssl x509 \
+  -in $ORG3_DIR/peers/peer0.org3.example.com/msp/signcerts/cert.pem \
+  -text -noout | grep -A1 "Subject:"
+# Esperado: una línea con OU = peer
 ```
 
 #### 2.2 Añadir Org3 al `configtx.yaml` y generar su definición JSON
@@ -1611,18 +1680,24 @@ peer channel join -b channel-artifacts/mychannel.block
 >
 > **Nota importante**: la rotación de certificados de **enrollment** (no TLS) no requiere reiniciar el nodo, basta con que el cliente use el nuevo cert al firmar transacciones. Pero la rotación de **TLS** sí requiere reinicio del proceso del peer/orderer porque el TLS se carga al arrancar.
 
-Usando la Fabric CA del doc 05, renovar certificados es sencillo. **Importante:** usa un directorio NUEVO para el `reenroll` (no machaques el del enrol inicial, te interesa conservarlo como referencia) y haz backup de los TLS actuales antes de reemplazarlos — si algo falla, vuelves al estado previo en segundos.
+Usando la Fabric CA del doc 05, renovar certificados es sencillo. **Importante**: el comando `reenroll` necesita una identidad PREVIA en `FABRIC_CA_CLIENT_HOME` para autenticarse contra la CA (no es un primer enroll). Por eso apuntamos al directorio del enrol TLS original (`fabric-ca/org1/peer0/tls`), del que el reenroll sobrescribirá los certs. Para poder volver atrás si algo falla, hacemos dos backups previos: el del directorio del cliente CA (donde están las claves originales) y el del directorio TLS del peer (donde están los certs montados en el contenedor).
 
 ```bash
 cd $HOME/red-con-ca
 
-# 0. Backup de los TLS actuales (por si algo va mal)
+# Variables para no repetir rutas largas
+PEER0_TLS_HOME=$PWD/fabric-ca/org1/peer0/tls
 ORG1_TLS_DIR=$PWD/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls
-cp -r $ORG1_TLS_DIR ${ORG1_TLS_DIR}.bak.$(date +%Y%m%d)
+TODAY=$(date +%Y%m%d)
 
-# 1. Reenrollar el peer con nuevos certs, en una carpeta NUEVA
-#    (NO uses $PWD/fabric-ca/org1/peer0/tls porque machacarías el enrol original)
-export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org1/peer0-tls-reenroll
+# 0. Backups (clave para poder dar marcha atrás)
+cp -r $PEER0_TLS_HOME  ${PEER0_TLS_HOME}.bak.$TODAY
+cp -r $ORG1_TLS_DIR    ${ORG1_TLS_DIR}.bak.$TODAY
+
+# 1. Reenroll TLS del peer. FABRIC_CA_CLIENT_HOME debe apuntar al
+#    directorio que YA tenía la identidad enrolada (con su cert+clave),
+#    no a una carpeta vacía. El reenroll sobrescribe el cert/clave ahí.
+export FABRIC_CA_CLIENT_HOME=$PEER0_TLS_HOME
 
 fabric-ca-client reenroll \
   -u https://localhost:7054 \
@@ -1632,8 +1707,8 @@ fabric-ca-client reenroll \
   --tls.certfiles $PWD/fabric-ca/org1/tls-cert.pem
 
 # 2. Copiar los nuevos certs al directorio TLS del peer
-cp $FABRIC_CA_CLIENT_HOME/msp/signcerts/cert.pem  $ORG1_TLS_DIR/server.crt
-cp $FABRIC_CA_CLIENT_HOME/msp/keystore/*_sk       $ORG1_TLS_DIR/server.key
+cp $PEER0_TLS_HOME/msp/signcerts/* $ORG1_TLS_DIR/server.crt
+cp $PEER0_TLS_HOME/msp/keystore/*  $ORG1_TLS_DIR/server.key
 
 # 3. Reiniciar el peer para que cargue los nuevos certificados
 docker restart peer0.org1.example.com
@@ -1646,11 +1721,22 @@ export CORE_PEER_MSPCONFIGPATH=$PWD/organizations/peerOrganizations/org1.example
 peer channel list
 ```
 
-Si todo va bien, ya puedes borrar el backup `${ORG1_TLS_DIR}.bak.YYYYMMDD` cuando lleves unos días sin incidencias.
+Si todo va bien, cuando lleves unos días sin incidencias puedes borrar los dos backups:
 
-> **Si el peer no arranca tras el reinicio:** restaura el backup
-> (`rm -rf $ORG1_TLS_DIR && mv ${ORG1_TLS_DIR}.bak.YYYYMMDD $ORG1_TLS_DIR && docker restart peer0.org1.example.com`)
-> y revisa los logs del peer con `docker logs peer0.org1.example.com`. Causas habituales: el cert nuevo no incluye el SANS de `localhost` (faltó `--csr.hosts`), o el `keystore/*_sk` no se copió correctamente.
+```bash
+rm -rf ${PEER0_TLS_HOME}.bak.$TODAY
+rm -rf ${ORG1_TLS_DIR}.bak.$TODAY
+```
+
+> **Si el peer no arranca tras el reinicio:** restaura los dos backups y reinicia:
+>
+> ```bash
+> rm -rf $ORG1_TLS_DIR && mv ${ORG1_TLS_DIR}.bak.$TODAY $ORG1_TLS_DIR
+> rm -rf $PEER0_TLS_HOME && mv ${PEER0_TLS_HOME}.bak.$TODAY $PEER0_TLS_HOME
+> docker restart peer0.org1.example.com
+> ```
+>
+> Y revisa los logs del peer con `docker logs peer0.org1.example.com`. Causas habituales: el cert nuevo no incluye el SAN `localhost` (faltó `--csr.hosts`), o el `keystore/*` no se copió correctamente.
 
 ### Rotación de certificados de enrollment (no TLS)
 
@@ -1661,6 +1747,7 @@ A diferencia del TLS, los certificados de **enrollment** (los que firman transac
 export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org1/user1
 
 fabric-ca-client reenroll \
+  -u https://localhost:7054 \
   --caname ca-org1 \
   --enrollment.attrs "role,department" \
   --tls.certfiles $PWD/fabric-ca/org1/tls-cert.pem
@@ -1676,22 +1763,32 @@ A partir de ese momento, las aplicaciones cliente que carguen ese MSP usarán el
 Este caso merece atención aparte porque si caduca, **nadie puede ejecutar operaciones administrativas** sobre el canal (commit de chaincode, config updates, etc).
 
 ```bash
-# Reenrollar el admin de Org1
+# Variable para no repetir la ruta
+ADMIN_MSP_DIR=$PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+
+# 0. Backup del MSP del admin (por si algo falla)
+cp -r $ADMIN_MSP_DIR ${ADMIN_MSP_DIR}.bak.$(date +%Y%m%d)
+
+# 1. Reenroll del admin de Org1 (sobre el directorio que ya tiene su enrol original)
 export FABRIC_CA_CLIENT_HOME=$PWD/fabric-ca/org1/org1admin
 
 fabric-ca-client reenroll \
+  -u https://localhost:7054 \
   --caname ca-org1 \
   --tls.certfiles $PWD/fabric-ca/org1/tls-cert.pem
 
-# Copiar el nuevo cert y la nueva clave al MSP del admin
-cp $FABRIC_CA_CLIENT_HOME/msp/signcerts/cert.pem \
-   $PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/
+# 2. Borrar el cert y la clave antiguos del MSP del admin antes de copiar los nuevos
+#    (evita que queden dos ficheros en signcerts/ o keystore/, que confundiría a Fabric)
+rm -f $ADMIN_MSP_DIR/signcerts/*
+rm -f $ADMIN_MSP_DIR/keystore/*
 
-cp $FABRIC_CA_CLIENT_HOME/msp/keystore/*_sk \
-   $PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/
+# 3. Copiar el nuevo cert y la nueva clave
+cp $FABRIC_CA_CLIENT_HOME/msp/signcerts/* $ADMIN_MSP_DIR/signcerts/
+cp $FABRIC_CA_CLIENT_HOME/msp/keystore/*  $ADMIN_MSP_DIR/keystore/
 
-# Borrar el viejo (si quedó duplicado)
-ls $PWD/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/
+# 4. Verificar que el nuevo cert es del admin
+openssl x509 -in $ADMIN_MSP_DIR/signcerts/* -text -noout | grep -A1 "Subject:"
+# Esperado: una línea con OU = admin
 ```
 
 > **Recomendación**: vigila la caducidad del admin con `openssl x509 -in cert.pem -noout -enddate` y rota con al menos 60 días de margen. Si caduca antes de rotarlo, no hay forma de operar el canal hasta emitir uno nuevo (que requiere otro admin, lo cual puede ser un círculo vicioso si solo había uno).
