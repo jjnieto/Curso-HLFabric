@@ -59,26 +59,29 @@ El doc 05 montó las CAs y generó las identidades. Ahora levantamos los peers y
 
 A estas alturas del curso, unos alumnos ya han tocado los yaml, arrancado contenedores y creado el canal; otros vienen totalmente limpios. Para que **todos** partamos del mismo punto, ejecuta esta secuencia ANTES de seguir.
 
-**Lo que vamos a borrar** son los datos de runtime: contenedores Docker, sus volúmenes (donde vive el ledger y el world state), imágenes de chaincode generadas, la red Docker y los artefactos del canal.
+**Lo que vamos a borrar:** contenedores de peers/orderer/CouchDBs, sus volúmenes (donde viven los bloques y el world state), imágenes de chaincode generadas y artefactos del canal.
 
-**Lo que se CONSERVA** son las identidades enroladas y los MSPs construidos en el doc 05 (`fabric-ca/` y `organizations/`). Si necesitas rehacer eso también, lo digo al final del paso.
+**Lo que NO se toca:**
+- Las 3 CAs del doc 05 (siguen corriendo).
+- La red Docker `fabric-ca-net` (la usan las CAs).
+- Las carpetas `fabric-ca/` y `organizations/` (identidades enroladas y MSPs).
+- Los ficheros yaml de configuración (`docker-compose-ca.yaml`, `docker-compose-net.yaml`, `configtx.yaml`).
 
-#### Paso 1 — Parar y eliminar todos los contenedores
+Si necesitas rehacer alguna de esas cosas, lo digo al final del paso.
+
+#### Paso 1 — Parar y eliminar los contenedores de peers, orderer y CouchDBs
 
 ```bash
 cd $HOME/red-con-ca
 
-# Bajar la red (peers, orderer, CouchDBs) si existe. -v borra volúmenes.
+# Bajar SOLO la red (peers, orderer, CouchDBs). -v borra sus volúmenes.
+# Las CAs siguen vivas — NO se tocan.
 docker compose -f docker/docker-compose-net.yaml down -v 2>/dev/null || true
 
-# Bajar las CAs si están corriendo
-docker compose -f docker/docker-compose-ca.yaml down -v 2>/dev/null || true
-
-# Por si quedó algo huérfano fuera de los compose
-docker rm -f $(docker ps -aq --filter "name=peer0\\.")  2>/dev/null || true
+# Por si quedó algo huérfano de prácticas anteriores
+docker rm -f $(docker ps -aq --filter "name=peer0\\.")   2>/dev/null || true
 docker rm -f $(docker ps -aq --filter "name=orderer\\.") 2>/dev/null || true
-docker rm -f $(docker ps -aq --filter "name=ca\\.")     2>/dev/null || true
-docker rm -f $(docker ps -aq --filter "name=couchdb")   2>/dev/null || true
+docker rm -f $(docker ps -aq --filter "name=couchdb")    2>/dev/null || true
 ```
 
 El flag `-v` de `docker compose down` borra los **volúmenes** asociados — ahí viven el ledger del peer (los bloques) y el world state. Sin eso, al volver a levantar la red el peer reutilizaría datos antiguos.
@@ -91,15 +94,7 @@ Cada vez que se instala un chaincode, Fabric construye una imagen Docker `dev-pe
 docker rmi -f $(docker images -q --filter "reference=dev-peer0*") 2>/dev/null || true
 ```
 
-#### Paso 3 — Eliminar la red Docker compartida
-
-`fabric-ca-net` se reusa entre los dos compose. Si queda con configuración antigua, los nuevos contenedores no se reconectan bien:
-
-```bash
-docker network rm fabric-ca-net 2>/dev/null || true
-```
-
-#### Paso 4 — Borrar artefactos del canal y empaquetados locales
+#### Paso 3 — Borrar artefactos del canal y empaquetados locales
 
 ```bash
 rm -f $HOME/red-con-ca/channel-artifacts/*.block 2>/dev/null
@@ -108,44 +103,60 @@ rm -f $HOME/red-con-ca/channel-artifacts/*.json  2>/dev/null
 rm -f $HOME/red-con-ca/basic*.tar.gz             2>/dev/null
 ```
 
-#### Paso 5 — Verificar que todo está limpio
+#### Paso 4 — Verificar el estado
+
+Deben cumplirse las dos cosas: **peers/orderer/CouchDBs limpios** y **CAs + red vivas**.
 
 ```bash
-# No debe quedar ningún contenedor de Fabric
+# 1. No debe quedar ningún contenedor de peer, orderer o couchdb
 docker ps -a --format "{{.Names}}" | \
-  grep -E "peer0\\.|orderer\\.|^ca\\.|couchdb" \
-  || echo "✓ Contenedores: limpio"
+  grep -E "peer0\\.|orderer\\.|couchdb" \
+  || echo "✓ Contenedores de red: limpio"
 
-# No debe quedar ningún volumen
+# 2. No debe quedar ningún volumen de peer, orderer o couchdb
 docker volume ls --format "{{.Name}}" | \
   grep -E "peer0|orderer|couchdb" \
-  || echo "✓ Volúmenes: limpio"
+  || echo "✓ Volúmenes de red: limpio"
 
-# No debe quedar la red
-docker network ls --format "{{.Name}}" | \
-  grep -E "^fabric-ca-net$" \
-  || echo "✓ Red: limpia"
+# 3. Las 3 CAs deben SEGUIR corriendo
+docker ps --format "{{.Names}}\t{{.Status}}" | grep -E "^ca\\."
+# Esperado: ca.org1.example.com, ca.org2.example.com, ca.orderer.example.com (Up)
+
+# 4. La red Docker fabric-ca-net debe SEGUIR existiendo
+docker network ls --format "{{.Name}}" | grep -E "^fabric-ca-net$"
+# Esperado: fabric-ca-net
 ```
 
-Si las tres salidas dicen `✓ ... limpio`, ya puedes continuar al 0.1 con la garantía de empezar desde cero.
+Si los puntos 1 y 2 dicen `✓ ... limpio` y los 3 y 4 listan las CAs + la red, ya puedes continuar al 0.1.
 
-> **¿Y los yaml que toqué a mano?** Si has modificado `docker-compose-ca.yaml`, `docker-compose-net.yaml` o `configtx.yaml` de formas que no sabes deshacer, **bórralos** y créalos de nuevo con los YAML literales de este documento (0.1 para `docker-compose-net.yaml`, 0.3.1 para `configtx.yaml`):
+> **¿Las CAs no están corriendo?** Si en el punto 3 no salen las CAs, levántalas antes de seguir:
+>
+> ```bash
+> cd $HOME/red-con-ca
+> docker compose -f docker/docker-compose-ca.yaml up -d
+> ```
+>
+> Esto **no toca** las identidades en `fabric-ca/` (son bind mounts, no volúmenes Docker): solo arranca los procesos.
+
+> **¿Y los yaml que toqué a mano?** Si has modificado `docker-compose-net.yaml` o `configtx.yaml` de formas que no sabes deshacer, **bórralos** y créalos de nuevo con los YAML literales de este documento (0.1 para `docker-compose-net.yaml`, 0.3.1 para `configtx.yaml`):
 >
 > ```bash
 > rm -f $HOME/red-con-ca/docker/docker-compose-net.yaml
 > rm -f $HOME/red-con-ca/configtx.yaml
 > ```
 >
-> No borres `docker-compose-ca.yaml` si las CAs siguen funcionando bien: si las paraste con `-v` en el paso 1, el contenido del fichero sigue intacto y vale.
+> **No borres `docker-compose-ca.yaml`** — las CAs lo están usando ahora mismo. Si crees que está dañado, primero baja las CAs (`docker compose -f docker/docker-compose-ca.yaml down`, **sin `-v`** para no perder identidades), corrige el yaml, y vuelve a levantarlas.
 
-> **¿Quieres rehacer también el doc 05 (CAs e identidades)?** Solo hazlo si las identidades quedaron corruptas o quieres practicar el doc 05 entero otra vez. Borra adicionalmente:
+> **¿Quieres rehacer también el doc 05 (CAs e identidades)?** Solo hazlo si las identidades quedaron corruptas o quieres practicar el doc 05 entero otra vez. Para ello primero baja las CAs con `-v` y luego borra las carpetas:
 >
 > ```bash
-> rm -rf $HOME/red-con-ca/fabric-ca
-> rm -rf $HOME/red-con-ca/organizations
+> cd $HOME/red-con-ca
+> docker compose -f docker/docker-compose-ca.yaml down -v
+> docker network rm fabric-ca-net
+> rm -rf fabric-ca organizations
 > ```
 >
-> Tendrás que rehacer el doc 05 completo antes de continuar aquí. **Lo habitual es NO borrarlas** y reutilizar lo que el doc 05 generó.
+> Tendrás que rehacer el doc 05 completo antes de continuar aquí. **Lo habitual es NO borrar nada de esto** y reutilizar lo que el doc 05 generó.
 
 ### 0.1 Docker Compose para la red
 
