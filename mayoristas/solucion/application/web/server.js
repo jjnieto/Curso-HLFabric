@@ -39,8 +39,13 @@ const app = express();
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Sirve estáticos del frontend si existen (lo añadiremos en el siguiente paso).
+// Sirve estáticos del frontend.
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Sirve la documentación junto al frontend para que los enlaces del footer
+// (API.md, openapi.yaml) funcionen desde el navegador.
+app.get('/API.md',      (_req, res) => res.sendFile(path.join(__dirname, 'API.md')));
+app.get('/openapi.yaml', (_req, res) => res.sendFile(path.join(__dirname, 'openapi.yaml')));
 
 // ── Health ───────────────────────────────────────────────────────
 app.get('/api/health', wrap(async (_req, res) => {

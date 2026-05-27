@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DistribuTech — Trazabilidad en blockchain</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body data-role="welcome">
+
+<header class="topbar">
+    <div class="brand">
+        <div class="brand-mark" aria-hidden="true">⬡</div>
+        <div class="brand-text">
+            <div class="brand-name">DistribuTech</div>
+            <div class="brand-sub">Trazabilidad en blockchain</div>
+        </div>
+    </div>
+    <nav class="role-tabs" id="role-tabs" aria-label="Selecciona tu rol">
+        <button class="role-tab" data-role="fabricante" type="button">
+            <span class="dot dot-fabricante" aria-hidden="true"></span>
+            <span>Fabricante</span>
+        </button>
+        <button class="role-tab" data-role="mayorista" type="button">
+            <span class="dot dot-mayorista" aria-hidden="true"></span>
+            <span>Mayorista</span>
+        </button>
+        <button class="role-tab" data-role="minorista" type="button">
+            <span class="dot dot-minorista" aria-hidden="true"></span>
+            <span>Minorista</span>
+        </button>
+        <button class="role-tab" data-role="cliente" type="button">
+            <span class="dot dot-cliente" aria-hidden="true"></span>
+            <span>Cliente final</span>
+        </button>
+    </nav>
+</header>
+
+<main id="main"></main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

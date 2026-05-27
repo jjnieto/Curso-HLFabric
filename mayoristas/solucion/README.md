@@ -371,8 +371,14 @@ solucion/
 │   ├── sanity-check.js                  # CLI: flujo end-to-end completo
 │   ├── utils/fabric-connection.js       # Gateway compartido
 │   └── web/
-│       ├── server.js                    # API REST (Express)
-│       └── sanity-check.js              # API: pruebas HTTP end-to-end
+│       ├── server.js                    # API REST (Express) + static
+│       ├── sanity-check.js              # API: pruebas HTTP end-to-end
+│       ├── API.md                       # Documentación de referencia
+│       ├── openapi.yaml                 # Spec OpenAPI 3.0
+│       └── public/                      # Frontend (vanilla JS)
+│           ├── index.html
+│           ├── styles.css
+│           └── app.js
 └── scripts/
     ├── common.sh
     ├── 01-setup-cas.sh

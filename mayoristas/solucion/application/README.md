@@ -106,18 +106,23 @@ node minorista.js activar-garantia SN-001 cliente-juan 24
 node minorista.js verificar-autenticidad SN-001
 ```
 
-## API REST
+## API REST + Frontend web
 
-Para integrar con un frontend web (paso siguiente del proyecto) hay un servidor Express en `web/` que expone todas las operaciones por HTTP.
+El directorio `web/` contiene un servidor Express que sirve **dos cosas**:
 
-- **Documentación de la API**: [web/API.md](web/API.md) — referencia completa de endpoints, parámetros, modelos de datos y ejemplos.
-- **Spec OpenAPI 3.0**: [web/openapi.yaml](web/openapi.yaml) — para Swagger UI, Postman, generadores de clientes…
-- **Guía operativa**: [web/README.md](web/README.md) — cómo arrancar, configurar y probar.
+1. La **API REST** con todas las operaciones de las 3 orgs + endpoints públicos para el cliente final.
+2. Un **frontend visual** (`public/`) con role switcher, formularios por rol y la verificación QR-style del cliente final.
 
 ```bash
 npm run api          # arranca el servidor en http://localhost:3000
 npm run api:check    # sanity-check end-to-end vía HTTP
 ```
+
+Después abre [http://localhost:3000](http://localhost:3000) en el navegador.
+
+- **Documentación de la API**: [web/API.md](web/API.md) — referencia completa de endpoints, parámetros, modelos de datos y ejemplos.
+- **Spec OpenAPI 3.0**: [web/openapi.yaml](web/openapi.yaml) — para Swagger UI, Postman, generadores de clientes…
+- **Guía operativa**: [web/README.md](web/README.md) — cómo arrancar, configurar y probar.
 
 ## Variables de entorno
 

@@ -1,8 +1,11 @@
-# DistribuTech — API REST
+# DistribuTech — API REST + Frontend
 
-Servidor HTTP único que expone las operaciones de las 3 organizaciones por endpoints REST, más un set público para el cliente final.
+Servidor HTTP único que expone:
 
-Pensado como capa de integración para el frontend web (próximo paso) y como prototipo demostrable a inversores.
+- **API REST** con las operaciones de las 3 organizaciones, más un set público para el cliente final.
+- **Frontend web** (`public/`) que demuestra visualmente el flujo: registro, pedidos, custodia, garantías y verificación del cliente final.
+
+Pensado como prototipo demostrable a inversores.
 
 > **📘 Documentación completa de la API**: [API.md](API.md). Este README es la guía operativa (cómo arrancar, configurar, probar). Para la referencia de endpoints, modelo de datos, ejemplos curl y formato de errores, ve a `API.md`.
 >
@@ -21,6 +24,8 @@ cd application      # desde solucion/
 npm install         # solo la primera vez
 npm run api         # arranca en http://localhost:3000
 ```
+
+Después abre [http://localhost:3000](http://localhost:3000) en el navegador para usar el **frontend web** (selector de rol y vista del cliente final con timeline de trazabilidad).
 
 Variables de entorno:
 
@@ -50,6 +55,23 @@ Ver [API.md](API.md) para la referencia completa con parámetros, payloads, ejem
 | Mayorista (`/api/mayorista`) | 5 POST + 3 GET |
 | Minorista (`/api/minorista`) | 4 POST + 3 GET |
 | Público (`/api/public`, sin auth) | 3 GET (producto, garantía, trazabilidad) |
+
+## Frontend
+
+El servidor también sirve un frontend en `public/` (vanilla JS sin build):
+
+- **Selector de rol** arriba a la derecha: Fabricante / Mayorista / Minorista / Cliente final.
+- Cada rol tiene su panel con formularios para sus operaciones (color coded), un log de actividad y resultados inline.
+- La vista de **Cliente final** es la "killer demo": el usuario introduce un número de serie y ve en pantalla 3 tarjetas (autenticidad ✓, garantía con fechas, trayectoria como timeline vertical con cada transferencia).
+
+Estructura del frontend:
+
+```
+public/
+├── index.html      # Estructura
+├── styles.css      # Diseño moderno con variables CSS por rol
+└── app.js          # Lógica de vistas, fetch() a la API y verificación pública
+```
 
 ## Notas
 
