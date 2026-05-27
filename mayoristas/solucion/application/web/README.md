@@ -4,6 +4,8 @@ Servidor HTTP único que expone las operaciones de las 3 organizaciones por endp
 
 Pensado como capa de integración para el frontend web (próximo paso) y como prototipo demostrable a inversores.
 
+> **📘 Documentación completa de la API**: [API.md](API.md). Este README es la guía operativa (cómo arrancar, configurar, probar). Para la referencia de endpoints, modelo de datos, ejemplos curl y formato de errores, ve a `API.md`.
+
 ## Arquitectura
 
 - **Un solo servidor Express** que internamente mantiene 3 conexiones Gateway (una por org), abiertas al arrancar y reutilizadas en cada request.
@@ -35,74 +37,17 @@ npm run api:check
 
 Si ya tienes el servidor corriendo y quieres ejecutar las pruebas contra él, usa `NO_SPAWN=1 npm run api:check`.
 
-## Endpoints
+## Resumen de endpoints
 
-### Health
+Ver [API.md](API.md) para la referencia completa con parámetros, payloads, ejemplos y modelos de datos. Resumen rápido:
 
-| Método | Path | Descripción |
-|--------|------|-------------|
-| GET | `/api/health` | Status y orgs conectadas |
-
-### Fabricante (`/api/fabricante`)
-
-| Método | Path | Body |
-|--------|------|------|
-| POST | `/registrar-producto` | `{ serie, modelo, lote }` |
-| POST | `/transferir-custodia` | `{ serie, destinoMSP }` |
-| POST | `/aceptar-pedido` | `{ pedidoId }` |
-| POST | `/registrar-envio` | `{ pedidoId, tracking }` |
-| POST | `/resolver-reclamacion` | `{ reclamacionId, resolucion, aceptada }` |
-| GET | `/producto/:serie` | — |
-| GET | `/pedido/:id` | (canal-mayorista) |
-
-### Mayorista (`/api/mayorista`)
-
-| Método | Path | Body |
-|--------|------|------|
-| POST | `/crear-pedido-fabricante` | `{ pedidoId, lineas: [{ producto, cantidad, precio }] }` |
-| POST | `/confirmar-recepcion-fabricante` | `{ pedidoId }` |
-| POST | `/transferir-custodia` | `{ serie, destinoMSP }` |
-| POST | `/aceptar-pedido-minorista` | `{ pedidoId }` |
-| POST | `/registrar-envio-minorista` | `{ pedidoId, tracking }` |
-| GET | `/producto/:serie` | — |
-| GET | `/pedido-fabricante/:id` | (canal-mayorista) |
-| GET | `/pedido-minorista/:id` | (canal-minorista) |
-
-### Minorista (`/api/minorista`)
-
-| Método | Path | Body |
-|--------|------|------|
-| POST | `/crear-pedido-mayorista` | `{ pedidoId, lineas }` |
-| POST | `/confirmar-recepcion-mayorista` | `{ pedidoId }` |
-| POST | `/activar-garantia` | `{ serie, clienteFinal, meses }` |
-| POST | `/reclamar-garantia` | `{ serie, motivo }` → devuelve `reclamacionId` |
-| GET | `/producto/:serie` | — |
-| GET | `/garantia/:serie` | — |
-| GET | `/pedido/:id` | — |
-
-### Público (cliente final, sin auth)
-
-| Método | Path | Descripción |
-|--------|------|-------------|
-| GET | `/api/public/producto/:serie` | Datos del producto (sin precios ni datos comerciales) |
-| GET | `/api/public/garantia/:serie` | Estado de la garantía |
-| GET | `/api/public/trazabilidad/:serie` | Historial completo de custodia |
-
-## Ejemplo de uso con curl
-
-```bash
-# Health
-curl http://localhost:3000/api/health
-
-# Fabricante registra producto
-curl -X POST http://localhost:3000/api/fabricante/registrar-producto \
-  -H "Content-Type: application/json" \
-  -d '{"serie":"SN-1234","modelo":"Laptop X","lote":"L001"}'
-
-# Cliente final verifica autenticidad
-curl http://localhost:3000/api/public/producto/SN-1234
-curl http://localhost:3000/api/public/trazabilidad/SN-1234
-```
+| Grupo | Endpoints |
+|---|---|
+| Sistema | `GET /api/health` |
+| Fabricante (`/api/fabricante`) | 5 POST + 2 GET |
+| Mayorista (`/api/mayorista`) | 5 POST + 3 GET |
+| Minorista (`/api/minorista`) | 4 POST + 3 GET |
+| Público (`/api/public`, sin auth) | 3 GET (producto, garantía, trazabilidad) |
 
 ## Notas
 
