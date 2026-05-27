@@ -195,7 +195,17 @@ sudo apt-get update
 sudo apt-get install -y golang-go
 ```
 
-### 5. Levantar la red
+### 5. Cargar el entorno (cada vez que abras una terminal nueva)
+
+`PATH` y `FABRIC_CFG_PATH` son variables de entorno: solo viven en la sesión actual. Si cierras la terminal las pierdes y los scripts dejarán de encontrar `peer`. Hay un `env.sh` listo para evitarte teclear las exports cada vez:
+
+```bash
+source env.sh
+```
+
+Debería imprimir `OK: peer disponible -> .../bin/peer`. Hazlo cada vez que abras una terminal nueva para trabajar con la red.
+
+### 6. Levantar la red
 
 ```bash
 bash scripts/01-setup-cas.sh          # 4 CAs + identidades
