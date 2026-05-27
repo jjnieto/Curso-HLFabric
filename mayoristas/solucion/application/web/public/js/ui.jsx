@@ -1,7 +1,15 @@
 // ────────────────────────────────────────────────────────────
 //   RAYO — Shared UI primitives
 // ────────────────────────────────────────────────────────────
+// Exponer hooks en window para que los demás scripts text/babel puedan usarlos.
+// Top-level `const` queda en script scope (no global), así que sin esto los
+// otros .jsx ven `useState is not defined` y React no llega a montar nada.
 const { useState, useEffect, useRef, useMemo, useCallback } = React;
+window.useState    = useState;
+window.useEffect   = useEffect;
+window.useRef      = useRef;
+window.useMemo     = useMemo;
+window.useCallback = useCallback;
 
 // ── Logo / mark ──────────────────────────────────────────────
 function RayoMark({ size = 22 }) {
