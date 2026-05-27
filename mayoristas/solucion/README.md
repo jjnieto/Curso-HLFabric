@@ -36,7 +36,86 @@ git checkout main
 cd mayoristas/solucion
 ```
 
-### 2. Tener los binarios de Fabric disponibles
+### 2. Instalar Docker
+
+Necesitas Docker Engine + Docker Compose v2. Comprueba primero si ya lo tienes:
+
+```bash
+docker --version && docker compose version
+```
+
+Si los dos comandos devuelven una versión, salta al paso 3. Si no, instala según tu sistema:
+
+#### Linux (Ubuntu / Debian)
+
+Usa el repositorio oficial de Docker:
+
+```bash
+# 1. Quitar versiones viejas (por si acaso)
+for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do
+  sudo apt-get remove -y $pkg 2>/dev/null
+done
+
+# 2. Añadir el repositorio oficial
+sudo apt-get update && sudo apt-get install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
+# 3. Instalar
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# 4. Permitir uso sin sudo (los scripts de Fabric lo necesitan)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# 5. Verificar
+docker run hello-world
+```
+
+> En Debian sustituye `ubuntu` por `debian` en las dos URLs de arriba. Para Fedora/RHEL/CentOS y otras distros, sigue las [instrucciones oficiales](https://docs.docker.com/engine/install/).
+
+#### macOS
+
+Instala **Docker Desktop for Mac** (incluye Compose v2):
+
+- **Apple Silicon (M1/M2/M3)**: [Docker Desktop for Mac with Apple Silicon](https://desktop.docker.com/mac/main/arm64/Docker.dmg)
+- **Intel**: [Docker Desktop for Mac with Intel chip](https://desktop.docker.com/mac/main/amd64/Docker.dmg)
+
+O con Homebrew:
+
+```bash
+brew install --cask docker
+open /Applications/Docker.app
+```
+
+Asegúrate de abrir Docker Desktop al menos una vez para que arranque el daemon.
+
+#### Windows
+
+**Importante**: en Windows, los scripts de Fabric **deben ejecutarse desde WSL2** (Ubuntu), no desde PowerShell ni cmd.
+
+1. Activar WSL2 con Ubuntu (PowerShell como administrador):
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+   Reinicia y abre la terminal de Ubuntu que aparece en el menú de inicio.
+
+2. Instalar **Docker Desktop for Windows** (incluye Compose v2): [Docker Desktop installer](https://desktop.docker.com/win/main/amd64/Docker%20Desktop%20Installer.exe).
+
+3. En Docker Desktop → Settings → Resources → WSL Integration, **activa la integración con tu Ubuntu**.
+
+4. Reinicia la terminal de Ubuntu y comprueba:
+   ```bash
+   docker --version && docker compose version
+   ```
+
+A partir de aquí, todos los comandos del README los ejecutas dentro de la terminal de **Ubuntu (WSL2)**.
+
+### 3. Tener los binarios de Fabric disponibles
 
 Comprueba primero si ya los tienes en el PATH:
 
@@ -70,7 +149,7 @@ fabric-ca-client version
 ls "$FABRIC_CFG_PATH/core.yaml"
 ```
 
-### 3. Levantar la red
+### 4. Levantar la red
 
 ```bash
 bash scripts/01-setup-cas.sh          # 4 CAs + identidades
