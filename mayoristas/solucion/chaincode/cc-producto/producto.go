@@ -108,7 +108,10 @@ func (c *ProductoContract) TransferirCustodia(ctx contractapi.TransactionContext
 	if err != nil {
 		return fmt.Errorf("error serializando la transferencia: %v", err)
 	}
-	txKey := fmt.Sprintf("TX~%s~%s", numeroSerie, ctx.GetStub().GetTxID())
+	txKey, err := ctx.GetStub().CreateCompositeKey("transferencia", []string{numeroSerie, ctx.GetStub().GetTxID()})
+	if err != nil {
+		return fmt.Errorf("error creando composite key: %v", err)
+	}
 	if err := ctx.GetStub().PutState(txKey, txData); err != nil {
 		return fmt.Errorf("error guardando la transferencia: %v", err)
 	}
@@ -154,10 +157,7 @@ func (c *ProductoContract) VerificarAutenticidad(ctx contractapi.TransactionCont
 		return nil, fmt.Errorf("el producto %s no existe", numeroSerie)
 	}
 
-	iterator, err := ctx.GetStub().GetStateByRange(
-		fmt.Sprintf("TX~%s~", numeroSerie),
-		fmt.Sprintf("TX~%s~\xff", numeroSerie),
-	)
+	iterator, err := ctx.GetStub().GetStateByPartialCompositeKey("transferencia", []string{numeroSerie})
 	if err != nil {
 		return nil, fmt.Errorf("error consultando transferencias: %v", err)
 	}
