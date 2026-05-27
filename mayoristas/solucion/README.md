@@ -368,8 +368,11 @@ solucion/
 │   ├── fabricante.js                    # CLI del Fabricante
 │   ├── mayorista.js                     # CLI del Mayorista
 │   ├── minorista.js                     # CLI del Minorista
-│   ├── sanity-check.js                  # Flujo end-to-end completo
-│   └── utils/fabric-connection.js       # Gateway compartido
+│   ├── sanity-check.js                  # CLI: flujo end-to-end completo
+│   ├── utils/fabric-connection.js       # Gateway compartido
+│   └── web/
+│       ├── server.js                    # API REST (Express)
+│       └── sanity-check.js              # API: pruebas HTTP end-to-end
 └── scripts/
     ├── common.sh
     ├── 01-setup-cas.sh

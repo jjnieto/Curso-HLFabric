@@ -106,6 +106,15 @@ node minorista.js activar-garantia SN-001 cliente-juan 24
 node minorista.js verificar-autenticidad SN-001
 ```
 
+## API REST
+
+Para integrar con un frontend web (paso siguiente del proyecto) hay un servidor Express en `web/` que expone todas las operaciones por HTTP. Ver [web/README.md](web/README.md) para detalles.
+
+```bash
+npm run api          # arranca el servidor en http://localhost:3000
+npm run api:check    # sanity-check end-to-end vía HTTP
+```
+
 ## Variables de entorno
 
 | Variable | Por defecto | Para qué |
