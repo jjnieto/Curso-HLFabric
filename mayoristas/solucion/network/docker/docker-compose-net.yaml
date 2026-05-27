@@ -1,5 +1,3 @@
-version: '3.7'
-
 volumes:
   orderer.distributech.com:
   peer0.fabricante.distributech.com:
