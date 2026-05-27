@@ -1,0 +1,930 @@
+openapi: 3.0.3
+
+info:
+  title: DistribuTech API
+  version: 0.1.0
+  description: |
+    API REST sobre Hyperledger Fabric para una red de distribución de tecnología.
+
+    Capa HTTP que expone las operaciones de las tres organizaciones de la red
+    DistribuTech (Fabricante, Mayorista, Minorista) y un set público para el
+    cliente final.
+
+    - Cada endpoint encapsula una invocación al chaincode sobre el canal adecuado.
+    - El servidor mantiene una conexión Gateway abierta por organización y la
+      reutiliza en cada request.
+    - Documentación de referencia legible: [API.md](API.md).
+  license:
+    name: Curso HLFabric — material didáctico
+  contact:
+    name: DistribuTech
+    url: https://github.com/jjnieto/Curso-HLFabric
+
+servers:
+  - url: http://localhost:3000
+    description: Desarrollo local
+
+tags:
+  - name: Sistema
+    description: Endpoints transversales (health, metadatos)
+  - name: Fabricante
+    description: Operaciones que ejecuta la organización Fabricante (FabricanteMSP)
+  - name: Mayorista
+    description: Operaciones que ejecuta la organización Mayorista (MayoristaMSP)
+  - name: Minorista
+    description: Operaciones que ejecuta la organización Minorista (MinoristaMSP)
+  - name: Público
+    description: Consultas sin autenticación, pensadas para el cliente final (QR del producto)
+
+# ────────────────────────────────────────────────────────────────
+#   PATHS
+# ────────────────────────────────────────────────────────────────
+paths:
+
+  /api/health:
+    get:
+      tags: [Sistema]
+      summary: Health check del servidor
+      description: Devuelve el estado de las conexiones Gateway abiertas al arrancar.
+      responses:
+        '200':
+          description: Servidor operativo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: ok
+                orgs: [fabricante, mayorista, minorista]
+
+  # ── Fabricante ─────────────────────────────────────────────────
+  /api/fabricante/registrar-producto:
+    post:
+      tags: [Fabricante]
+      summary: Registrar un producto nuevo
+      description: |
+        Crea una nueva unidad de producto en `canal-trazabilidad`. Solo la
+        organización Fabricante puede invocarla (controlado por ACL en el
+        chaincode).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarProductoRequest'
+      responses:
+        '200':
+          description: Producto registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkConSerie'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/fabricante/transferir-custodia:
+    post:
+      tags: [Fabricante]
+      summary: Transferir la custodia de un producto
+      description: Transfiere la custodia al MSP indicado, típicamente `MayoristaMSP`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferirCustodiaRequest'
+      responses:
+        '200':
+          description: Custodia transferida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/fabricante/aceptar-pedido:
+    post:
+      tags: [Fabricante]
+      summary: Aceptar un pedido del mayorista
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoIdRequest'
+      responses:
+        '200':
+          description: Pedido aceptado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/fabricante/registrar-envio:
+    post:
+      tags: [Fabricante]
+      summary: Registrar el envío de un pedido
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarEnvioRequest'
+      responses:
+        '200':
+          description: Envío registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/fabricante/resolver-reclamacion:
+    post:
+      tags: [Fabricante]
+      summary: Resolver una reclamación de garantía
+      description: Acepta o rechaza una reclamación abierta por el minorista.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolverReclamacionRequest'
+      responses:
+        '200':
+          description: Reclamación resuelta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/fabricante/producto/{serie}:
+    get:
+      tags: [Fabricante]
+      summary: Consultar un producto
+      parameters:
+        - $ref: '#/components/parameters/Serie'
+      responses:
+        '200':
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/fabricante/pedido/{id}:
+    get:
+      tags: [Fabricante]
+      summary: Consultar un pedido en canal-mayorista
+      parameters:
+        - $ref: '#/components/parameters/PedidoId'
+      responses:
+        '200':
+          description: Pedido encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pedido'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Mayorista ──────────────────────────────────────────────────
+  /api/mayorista/crear-pedido-fabricante:
+    post:
+      tags: [Mayorista]
+      summary: Crear un pedido al fabricante
+      description: Pedido del Mayorista al Fabricante en `canal-mayorista`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearPedidoRequest'
+      responses:
+        '200':
+          description: Pedido creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkConPedidoId'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/mayorista/confirmar-recepcion-fabricante:
+    post:
+      tags: [Mayorista]
+      summary: Confirmar recepción del envío del fabricante
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoIdRequest'
+      responses:
+        '200':
+          description: Recepción confirmada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/mayorista/transferir-custodia:
+    post:
+      tags: [Mayorista]
+      summary: Transferir la custodia de un producto
+      description: Transferencia típica `MayoristaMSP` → `MinoristaMSP`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferirCustodiaRequest'
+      responses:
+        '200':
+          description: Custodia transferida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/mayorista/aceptar-pedido-minorista:
+    post:
+      tags: [Mayorista]
+      summary: Aceptar un pedido del minorista
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoIdRequest'
+      responses:
+        '200':
+          description: Pedido aceptado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/mayorista/registrar-envio-minorista:
+    post:
+      tags: [Mayorista]
+      summary: Registrar el envío del pedido al minorista
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarEnvioRequest'
+      responses:
+        '200':
+          description: Envío registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/mayorista/producto/{serie}:
+    get:
+      tags: [Mayorista]
+      summary: Consultar un producto
+      parameters:
+        - $ref: '#/components/parameters/Serie'
+      responses:
+        '200':
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/mayorista/pedido-fabricante/{id}:
+    get:
+      tags: [Mayorista]
+      summary: Consultar un pedido en canal-mayorista
+      parameters:
+        - $ref: '#/components/parameters/PedidoId'
+      responses:
+        '200':
+          description: Pedido encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pedido'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/mayorista/pedido-minorista/{id}:
+    get:
+      tags: [Mayorista]
+      summary: Consultar un pedido en canal-minorista
+      parameters:
+        - $ref: '#/components/parameters/PedidoId'
+      responses:
+        '200':
+          description: Pedido encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pedido'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Minorista ──────────────────────────────────────────────────
+  /api/minorista/crear-pedido-mayorista:
+    post:
+      tags: [Minorista]
+      summary: Crear un pedido al mayorista
+      description: Pedido del Minorista al Mayorista en `canal-minorista`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearPedidoRequest'
+      responses:
+        '200':
+          description: Pedido creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkConPedidoId'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/minorista/confirmar-recepcion-mayorista:
+    post:
+      tags: [Minorista]
+      summary: Confirmar recepción del envío del mayorista
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoIdRequest'
+      responses:
+        '200':
+          description: Recepción confirmada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/minorista/activar-garantia:
+    post:
+      tags: [Minorista]
+      summary: Activar la garantía de un producto
+      description: Vincula una garantía al cliente final en el momento de la venta.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivarGarantiaRequest'
+      responses:
+        '200':
+          description: Garantía activada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ok'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/minorista/reclamar-garantia:
+    post:
+      tags: [Minorista]
+      summary: Abrir una reclamación de garantía
+      description: Genera una reclamación contra el fabricante y devuelve su identificador.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReclamarGarantiaRequest'
+      responses:
+        '200':
+          description: Reclamación creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkConReclamacionId'
+        '500':
+          $ref: '#/components/responses/Error'
+
+  /api/minorista/producto/{serie}:
+    get:
+      tags: [Minorista]
+      summary: Consultar un producto
+      parameters:
+        - $ref: '#/components/parameters/Serie'
+      responses:
+        '200':
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Producto'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/minorista/garantia/{serie}:
+    get:
+      tags: [Minorista]
+      summary: Consultar la garantía de un producto
+      parameters:
+        - $ref: '#/components/parameters/Serie'
+      responses:
+        '200':
+          description: Garantía encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Garantia'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/minorista/pedido/{id}:
+    get:
+      tags: [Minorista]
+      summary: Consultar un pedido en canal-minorista
+      parameters:
+        - $ref: '#/components/parameters/PedidoId'
+      responses:
+        '200':
+          description: Pedido encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pedido'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Públicos ───────────────────────────────────────────────────
+  /api/public/producto/{serie}:
+    get:
+      tags: [Público]
+      summary: Verificar autenticidad de un producto
+      description: |
+        Devuelve los datos públicos de un producto. **No expone** precios,
+        propietarios actuales ni datos comerciales. Pensado para que el
+        cliente final lo consulte escaneando el QR.
+      parameters:
+        - $ref: '#/components/parameters/Serie'
+      responses:
+        '200':
+          description: Producto auténtico
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductoPublico'
+        '404':
+          description: Producto no existe — posible falsificación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/public/garantia/{serie}:
+    get:
+      tags: [Público]
+      summary: Consultar el estado de la garantía
+      parameters:
+        - $ref: '#/components/parameters/Serie'
+      responses:
+        '200':
+          description: Estado de la garantía
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Garantia'
+        '404':
+          description: Sin garantía registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/public/trazabilidad/{serie}:
+    get:
+      tags: [Público]
+      summary: Trazabilidad completa del producto
+      description: Devuelve la cadena de custodia completa desde el fabricante.
+      parameters:
+        - $ref: '#/components/parameters/Serie'
+      responses:
+        '200':
+          description: Historial de custodia
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrazabilidadResponse'
+
+# ────────────────────────────────────────────────────────────────
+#   COMPONENTS
+# ────────────────────────────────────────────────────────────────
+components:
+
+  parameters:
+    Serie:
+      name: serie
+      in: path
+      required: true
+      description: Número de serie único del producto
+      schema:
+        type: string
+        example: SN-1234
+    PedidoId:
+      name: id
+      in: path
+      required: true
+      description: Identificador único del pedido
+      schema:
+        type: string
+        example: PED-001
+
+  responses:
+    Error:
+      description: Error genérico (500)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+
+    # ── Generales ──────────────────────────────────────────────
+    Ok:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+      required: [ok]
+
+    OkConSerie:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        serie:
+          type: string
+          example: SN-1234
+      required: [ok, serie]
+
+    OkConPedidoId:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        pedidoId:
+          type: string
+          example: PED-001
+      required: [ok, pedidoId]
+
+    OkConReclamacionId:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          example: true
+        reclamacionId:
+          type: string
+          example: REC~SN-1234~b1623a...
+      required: [ok, reclamacionId]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Descripción legible del error
+          example: el producto SN-NO-EXISTE no existe
+      required: [error]
+
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+        orgs:
+          type: array
+          items:
+            type: string
+          example: [fabricante, mayorista, minorista]
+      required: [status, orgs]
+
+    # ── Recursos del ledger ────────────────────────────────────
+    Producto:
+      type: object
+      properties:
+        docType:
+          type: string
+          example: producto
+        numeroSerie:
+          type: string
+          example: SN-1234
+        modelo:
+          type: string
+          example: Laptop X
+        lote:
+          type: string
+          example: L001
+        fechaFabricacion:
+          type: string
+          format: date-time
+          example: 2026-05-27T16:20:00+02:00
+        propietarioActual:
+          type: string
+          description: MSP ID del propietario actual
+          enum: [FabricanteMSP, MayoristaMSP, MinoristaMSP]
+          example: MayoristaMSP
+        estado:
+          type: string
+          enum: [REGISTRADO, EN_TRANSITO]
+          example: EN_TRANSITO
+      required: [numeroSerie, modelo, lote, propietarioActual, estado]
+
+    ProductoPublico:
+      type: object
+      description: Subset público del producto. No incluye precios ni propietarios.
+      properties:
+        numeroSerie:
+          type: string
+          example: SN-1234
+        modelo:
+          type: string
+          example: Laptop X
+        lote:
+          type: string
+          example: L001
+        fechaFabricacion:
+          type: string
+          format: date-time
+        estado:
+          type: string
+          enum: [REGISTRADO, EN_TRANSITO]
+      required: [numeroSerie, modelo, lote, estado]
+
+    TransferenciaCustodia:
+      type: object
+      properties:
+        docType:
+          type: string
+          example: transferencia
+        numeroSerie:
+          type: string
+          example: SN-1234
+        origen:
+          type: string
+          example: FabricanteMSP
+        destino:
+          type: string
+          example: MayoristaMSP
+        fecha:
+          type: string
+          format: date-time
+        txID:
+          type: string
+          description: Hash de la transacción Fabric
+          example: a1b2c3d4...
+
+    TrazabilidadResponse:
+      type: object
+      properties:
+        numeroSerie:
+          type: string
+          example: SN-1234
+        autenticidad:
+          type: string
+          enum: [verificada]
+          example: verificada
+        transferencias:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferenciaCustodia'
+      required: [numeroSerie, autenticidad, transferencias]
+
+    Garantia:
+      type: object
+      properties:
+        docType:
+          type: string
+          example: garantia
+        numeroSerie:
+          type: string
+          example: SN-1234
+        clienteFinal:
+          type: string
+          example: cliente@example.com
+        fechaActivacion:
+          type: string
+          format: date-time
+        fechaExpiracion:
+          type: string
+          format: date-time
+        estado:
+          type: string
+          enum: [ACTIVA, RECLAMADA, RESUELTA]
+          example: ACTIVA
+      required: [numeroSerie, clienteFinal, fechaActivacion, fechaExpiracion, estado]
+
+    Reclamacion:
+      type: object
+      properties:
+        docType:
+          type: string
+          example: reclamacion
+        id:
+          type: string
+          example: REC~SN-1234~b1623a...
+        numeroSerie:
+          type: string
+          example: SN-1234
+        motivo:
+          type: string
+        estado:
+          type: string
+          enum: [ABIERTA, ACEPTADA, RECHAZADA]
+        resolucion:
+          type: string
+        fecha:
+          type: string
+          format: date-time
+
+    LineaPedido:
+      type: object
+      properties:
+        producto:
+          type: string
+          description: Número de serie o identificador comercial del producto
+          example: SN-1234
+        cantidad:
+          type: integer
+          minimum: 1
+          example: 10
+        precio:
+          type: number
+          format: float
+          example: 850.00
+      required: [producto, cantidad, precio]
+
+    Pedido:
+      type: object
+      properties:
+        docType:
+          type: string
+          example: pedido
+        id:
+          type: string
+          example: PED-001
+        comprador:
+          type: string
+          example: MayoristaMSP
+        vendedor:
+          type: string
+          example: FabricanteMSP
+        lineas:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineaPedido'
+        estado:
+          type: string
+          enum: [CREADO, ACEPTADO, ENVIADO, RECIBIDO]
+        tracking:
+          type: string
+        fechaCreacion:
+          type: string
+          format: date-time
+        fechaActualizacion:
+          type: string
+          format: date-time
+      required: [id, comprador, lineas, estado]
+
+    # ── Request bodies ─────────────────────────────────────────
+    RegistrarProductoRequest:
+      type: object
+      properties:
+        serie:
+          type: string
+          example: SN-1234
+        modelo:
+          type: string
+          example: Laptop X
+        lote:
+          type: string
+          example: L001
+      required: [serie, modelo, lote]
+
+    TransferirCustodiaRequest:
+      type: object
+      properties:
+        serie:
+          type: string
+          example: SN-1234
+        destinoMSP:
+          type: string
+          enum: [FabricanteMSP, MayoristaMSP, MinoristaMSP]
+          example: MayoristaMSP
+      required: [serie, destinoMSP]
+
+    PedidoIdRequest:
+      type: object
+      properties:
+        pedidoId:
+          type: string
+          example: PED-001
+      required: [pedidoId]
+
+    RegistrarEnvioRequest:
+      type: object
+      properties:
+        pedidoId:
+          type: string
+          example: PED-001
+        tracking:
+          type: string
+          example: TRK-ABC123
+      required: [pedidoId, tracking]
+
+    ResolverReclamacionRequest:
+      type: object
+      properties:
+        reclamacionId:
+          type: string
+          example: REC~SN-1234~b1623a...
+        resolucion:
+          type: string
+          example: Sustituido por unidad nueva
+        aceptada:
+          type: boolean
+          description: true para aceptar la cobertura, false para rechazarla
+          example: true
+      required: [reclamacionId, resolucion, aceptada]
+
+    CrearPedidoRequest:
+      type: object
+      properties:
+        pedidoId:
+          type: string
+          example: PED-001
+        lineas:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/LineaPedido'
+      required: [pedidoId, lineas]
+
+    ActivarGarantiaRequest:
+      type: object
+      properties:
+        serie:
+          type: string
+          example: SN-1234
+        clienteFinal:
+          type: string
+          example: cliente@example.com
+        meses:
+          type: integer
+          minimum: 1
+          example: 24
+      required: [serie, clienteFinal, meses]
+
+    ReclamarGarantiaRequest:
+      type: object
+      properties:
+        serie:
+          type: string
+          example: SN-1234
+        motivo:
+          type: string
+          example: Pantalla defectuosa
+      required: [serie, motivo]

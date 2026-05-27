@@ -111,6 +111,7 @@ node minorista.js verificar-autenticidad SN-001
 Para integrar con un frontend web (paso siguiente del proyecto) hay un servidor Express en `web/` que expone todas las operaciones por HTTP.
 
 - **Documentación de la API**: [web/API.md](web/API.md) — referencia completa de endpoints, parámetros, modelos de datos y ejemplos.
+- **Spec OpenAPI 3.0**: [web/openapi.yaml](web/openapi.yaml) — para Swagger UI, Postman, generadores de clientes…
 - **Guía operativa**: [web/README.md](web/README.md) — cómo arrancar, configurar y probar.
 
 ```bash

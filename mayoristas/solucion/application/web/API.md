@@ -4,6 +4,8 @@ Documentación de referencia de la API REST de DistribuTech.
 
 La API expone las operaciones de las tres organizaciones de la red Fabric (**Fabricante**, **Mayorista**, **Minorista**) y un set de endpoints públicos para el **cliente final**.
 
+> **🤖 Spec OpenAPI 3.0**: [openapi.yaml](openapi.yaml). Importa este fichero en Swagger UI, Postman, Insomnia, Stoplight o cualquier herramienta compatible para generar UI interactiva, clientes en cualquier lenguaje, mocks o tests de contrato. Ver [#consumir-la-spec-openapi](#consumir-la-spec-openapi) más abajo.
+
 ---
 
 ## Tabla de contenidos
@@ -23,6 +25,7 @@ La API expone las operaciones de las tres organizaciones de la red Fabric (**Fab
   - [Públicos (cliente final)](#públicos-cliente-final)
 - [Flujo de ejemplo end-to-end](#flujo-de-ejemplo-end-to-end)
 - [Idempotencia y reintentos](#idempotencia-y-reintentos)
+- [Consumir la spec OpenAPI](#consumir-la-spec-openapi)
 - [Versiones](#versiones)
 
 ---
@@ -838,15 +841,86 @@ curl $BASE/api/public/trazabilidad/$SERIE
 
 ---
 
+## Consumir la spec OpenAPI
+
+El fichero [`openapi.yaml`](openapi.yaml) cumple con OpenAPI 3.0.3. Sirve para muchísimo más que documentación legible:
+
+### Visualizarla como UI interactiva (Swagger UI)
+
+```bash
+# Opción 1 — Docker (sin instalar nada local)
+docker run --rm -p 8080:8080 \
+  -e SWAGGER_JSON=/spec/openapi.yaml \
+  -v "$(pwd):/spec" \
+  swaggerapi/swagger-ui
+
+# Abre http://localhost:8080 — UI navegable con botones "Try it out"
+```
+
+```bash
+# Opción 2 — Redoc CLI (UI más limpia, estática)
+npx @redocly/cli build-docs openapi.yaml -o api-docs.html
+xdg-open api-docs.html
+```
+
+### Importarla en clientes habituales
+
+| Herramienta | Cómo |
+|---|---|
+| **Postman** | `Import` → arrastra `openapi.yaml` → genera colección automáticamente |
+| **Insomnia** | `Create` → `Import From` → `File` → `openapi.yaml` |
+| **Bruno** | `Open Collection` → soporte OpenAPI nativo |
+| **VSCode** | Extensión `42Crunch.vscode-openapi` (preview + linting) |
+| **JetBrains** | Soporte nativo: abre el `.yaml` y pulsa "Try it" en cada endpoint |
+
+### Generar clientes en cualquier lenguaje
+
+Con [openapi-generator](https://openapi-generator.tech/):
+
+```bash
+# Cliente TypeScript axios
+npx @openapitools/openapi-generator-cli generate \
+  -i openapi.yaml -g typescript-axios -o ./clients/ts
+
+# Cliente Python
+npx @openapitools/openapi-generator-cli generate \
+  -i openapi.yaml -g python -o ./clients/python
+
+# Cliente Go
+npx @openapitools/openapi-generator-cli generate \
+  -i openapi.yaml -g go -o ./clients/go
+```
+
+Soporta 50+ lenguajes y frameworks. Útil para que un cliente potencial pueda probar la integración con su stack en minutos.
+
+### Mock server (sin red Fabric)
+
+Si quieres enseñar la API a alguien sin levantar la red entera:
+
+```bash
+npx @stoplight/prism-cli mock openapi.yaml
+# Levanta un mock en http://localhost:4010 que devuelve los `example:` de la spec
+```
+
+### Tests de contrato
+
+Validar que el servidor real cumple con la spec:
+
+```bash
+npx @apidevtools/swagger-cli validate openapi.yaml
+npx dredd openapi.yaml http://localhost:3000
+```
+
+---
+
 ## Versiones
 
 | Versión | Fecha | Cambios |
 |---|---|---|
-| `0.1` (actual) | 2026-05-27 | Versión inicial — prototipo para demostraciones |
+| `0.1` (actual) | 2026-05-27 | Versión inicial — prototipo para demostraciones. Incluye spec OpenAPI 3.0.3. |
 
 Próximas mejoras planificadas:
 
 - Mapeo de errores de estado de chaincode a HTTP `409`.
 - Autenticación JWT en endpoints de organizaciones.
 - Endpoint de eventos (Server-Sent Events) para que los frontends reaccionen a transiciones en tiempo real.
-- Spec OpenAPI 3.0 generada automáticamente.

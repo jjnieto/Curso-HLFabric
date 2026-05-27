@@ -5,6 +5,8 @@ Servidor HTTP único que expone las operaciones de las 3 organizaciones por endp
 Pensado como capa de integración para el frontend web (próximo paso) y como prototipo demostrable a inversores.
 
 > **📘 Documentación completa de la API**: [API.md](API.md). Este README es la guía operativa (cómo arrancar, configurar, probar). Para la referencia de endpoints, modelo de datos, ejemplos curl y formato de errores, ve a `API.md`.
+>
+> **🤖 Spec OpenAPI 3.0**: [openapi.yaml](openapi.yaml). Compatible con Swagger UI, Postman, Insomnia, openapi-generator (clientes en 50+ lenguajes), Prism (mock server), etc. Instrucciones en [API.md → Consumir la spec OpenAPI](API.md#consumir-la-spec-openapi).
 
 ## Arquitectura
 
