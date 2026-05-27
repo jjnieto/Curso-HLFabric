@@ -1,0 +1,19 @@
+{
+  "name": "distributech-app",
+  "version": "1.0.0",
+  "description": "Apps cliente de DistribuTech — una por organización (Fabricante, Mayorista, Minorista)",
+  "private": true,
+  "scripts": {
+    "check": "node sanity-check.js",
+    "fabricante": "node fabricante.js",
+    "mayorista": "node mayorista.js",
+    "minorista": "node minorista.js"
+  },
+  "dependencies": {
+    "@hyperledger/fabric-gateway": "^1.5.0",
+    "@grpc/grpc-js": "^1.9.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

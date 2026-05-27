@@ -251,6 +251,50 @@ bash scripts/05-deploy-chaincodes.sh  # 3 chaincodes (4 despliegues)
 bash scripts/sanity-check.sh          # 9 fases de comprobación
 ```
 
+### 7. Instalar Node.js (solo si vas a usar las apps cliente)
+
+Las apps cliente (paso 8) están escritas en Node.js. Comprueba si ya lo tienes:
+
+```bash
+node --version    # debe imprimir v18.x o superior
+```
+
+Si no:
+
+#### Linux (Ubuntu / Debian)
+
+```bash
+sudo apt-get install -y nodejs npm
+```
+
+Ubuntu 24.04 trae Node 18.x. Si necesitas una versión más reciente, usa [NodeSource](https://github.com/nodesource/distributions) o [nvm](https://github.com/nvm-sh/nvm).
+
+#### macOS
+
+```bash
+brew install node
+```
+
+#### Windows (WSL2)
+
+Igual que Linux, dentro de la terminal de Ubuntu:
+
+```bash
+sudo apt-get install -y nodejs npm
+```
+
+### 8. Apps cliente
+
+Una vez la red está operativa, las apps cliente permiten que cada organización interactúe con el chaincode desde código real (no solo desde el CLI `peer`). Hay una CLI por organización y un sanity-check end-to-end.
+
+```bash
+cd application
+npm install
+npm run check     # sanity-check de las apps (flujo completo de un producto)
+```
+
+Detalles, comandos disponibles y ejemplos: [application/README.md](application/README.md).
+
 ## Canales y chaincodes
 
 | Canal | Organizaciones | Chaincode | Política de endoso |
@@ -320,6 +364,12 @@ solucion/
 │   ├── cc-producto/producto.go          # Registro y trazabilidad
 │   ├── cc-garantia/garantia.go          # Garantías y reclamaciones
 │   └── cc-pedido/pedido.go              # Pedidos (genérico, 2 despliegues)
+├── application/
+│   ├── fabricante.js                    # CLI del Fabricante
+│   ├── mayorista.js                     # CLI del Mayorista
+│   ├── minorista.js                     # CLI del Minorista
+│   ├── sanity-check.js                  # Flujo end-to-end completo
+│   └── utils/fabric-connection.js       # Gateway compartido
 └── scripts/
     ├── common.sh
     ├── 01-setup-cas.sh
