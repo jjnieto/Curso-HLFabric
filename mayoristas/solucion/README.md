@@ -36,12 +36,43 @@ git checkout main
 cd mayoristas/solucion
 ```
 
-### 2. Levantar la red
+### 2. Tener los binarios de Fabric disponibles
+
+Comprueba primero si ya los tienes en el PATH:
 
 ```bash
-export PATH=$HOME/practica01/bin:$PATH
-export FABRIC_CFG_PATH=$HOME/practica01/config
+which peer configtxgen osnadmin fabric-ca-client
+```
 
+- **Si los cuatro comandos devuelven una ruta**, ya estás listo. Asegúrate también de tener `FABRIC_CFG_PATH` apuntando al directorio `config/` (donde vive `core.yaml`):
+  ```bash
+  # Busca core.yaml cerca de los binarios
+  find / -name core.yaml 2>/dev/null | head -5
+  export FABRIC_CFG_PATH=/ruta/al/directorio/config
+  ```
+
+- **Si no los tienes**, descárgalos con el instalador oficial de Fabric:
+  ```bash
+  curl -sSLO https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
+  chmod +x install-fabric.sh
+  ./install-fabric.sh --fabric-version 2.5.9 --ca-version 1.5.7 binary
+  # Esto crea ./bin y ./config en el directorio actual
+
+  export PATH="$(pwd)/bin:$PATH"
+  export FABRIC_CFG_PATH="$(pwd)/config"
+  ```
+
+Verifica que todo está en su sitio:
+
+```bash
+peer version           # debe imprimir 2.5.x
+fabric-ca-client version
+ls "$FABRIC_CFG_PATH/core.yaml"
+```
+
+### 3. Levantar la red
+
+```bash
 bash scripts/01-setup-cas.sh          # 4 CAs + identidades
 bash scripts/02-build-msps.sh         # Construye organizations/
 bash scripts/03-start-network.sh      # Orderer + 3 peers + 3 CouchDBs
