@@ -114,15 +114,20 @@ set_org_env_minorista() {
 }
 
 # ── Resolver FABRIC_CFG_PATH para comandos peer ─────────────────
+# Importante: peer necesita encontrar core.yaml en FABRIC_CFG_PATH. Si la
+# variable ya está exportada pero apunta a un directorio sin core.yaml
+# (por ejemplo, porque antes la usamos para configtxgen apuntando a
+# network/), la sobreescribimos buscando una ubicación válida.
 resolve_fabric_cfg_path() {
-    if [ -n "${FABRIC_CFG_PATH:-}" ]; then
+    if [ -n "${FABRIC_CFG_PATH:-}" ] && [ -f "$FABRIC_CFG_PATH/core.yaml" ]; then
         return
     fi
     for candidate in \
+        "$DISTRIBUTECH_ROOT/config" \
         "$DISTRIBUTECH_ROOT/../../config" \
         "$HOME/practica01/config" \
         "$HOME/fabric/fabric-samples/config"; do
-        if [ -d "$candidate" ]; then
+        if [ -f "$candidate/core.yaml" ]; then
             export FABRIC_CFG_PATH="$(cd "$candidate" && pwd)"
             return
         fi
