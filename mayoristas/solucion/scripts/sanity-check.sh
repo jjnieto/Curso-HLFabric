@@ -11,9 +11,13 @@ source "$(dirname "$0")/common.sh"
 
 PASS=0; WARN=0; FAIL=0
 
-check_ok()   { ((PASS++)); log_ok   "$*"; }
-check_warn() { ((WARN++)); color_dim "  [WARN] $*"; }
-check_fail() { ((FAIL++)); log_err  "$*"; }
+# Importante: usamos PASS=$((PASS+1)) en lugar de ((PASS++)) porque el
+# postincremento devuelve el valor *antes* de incrementar (0 la primera
+# vez), y con `set -e` un retorno 0 aritmético se interpreta como fallo
+# y el script aborta silenciosamente.
+check_ok()   { PASS=$((PASS+1)); log_ok   "$*"; }
+check_warn() { WARN=$((WARN+1)); color_dim "  [WARN] $*"; }
+check_fail() { FAIL=$((FAIL+1)); log_err  "$*"; }
 
 # ═════════════════════════════════════════════════════════════════
 # FASE 1 — Contenedores Docker
