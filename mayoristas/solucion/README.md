@@ -205,6 +205,39 @@ source env.sh
 
 Debería imprimir `OK: peer disponible -> .../bin/peer`. Hazlo cada vez que abras una terminal nueva para trabajar con la red.
 
+#### Si `env.sh` no encuentra los binarios
+
+`env.sh` busca `bin/` y `config/` **junto a sí mismo** (es decir, dentro de `mayoristas/solucion/`). Funciona automáticamente si en el paso 3 ejecutaste `install-fabric.sh` desde este directorio.
+
+Si instalaste Fabric en otra ubicación (por ejemplo `$HOME/fabric/`, `/opt/fabric/`, una carpeta del curso anterior...), verás:
+
+```
+WARN: 'peer' no está en el PATH. ¿Has ejecutado install-fabric.sh en este directorio?
+```
+
+En ese caso, exporta las variables a mano apuntando a **tu** ruta. Localiza primero dónde tienes los binarios:
+
+```bash
+# Busca 'peer' por todo el home
+find $HOME -type f -name peer -executable 2>/dev/null
+
+# Busca 'core.yaml'
+find $HOME -type f -name core.yaml 2>/dev/null
+```
+
+Después exporta. Ejemplo si los tienes en `$HOME/fabric/`:
+
+```bash
+export PATH="$HOME/fabric/bin:$PATH"
+export FABRIC_CFG_PATH="$HOME/fabric/config"
+
+# Verifica
+peer version
+ls "$FABRIC_CFG_PATH/core.yaml"
+```
+
+Tendrás que repetir esos `export` cada vez que abras una terminal nueva. Si quieres que sea permanente, añádelos al final de tu `~/.bashrc` (o `~/.zshrc` en macOS).
+
 ### 6. Levantar la red
 
 ```bash
