@@ -8,3 +8,4 @@ Propuesta de red blockchain permisionada para la cadena de distribución de tecn
 |-----------|-----------|
 | [Propuesta técnica](propuesta-tecnica.md) | Arquitectura de la red, diagramas, canales, chaincodes y modelo de datos |
 | [Elevator pitch](elevator-pitch.md) | Propuesta comercial con ventajas competitivas para presentar a clientes |
+| [Aclaraciones](aclaraciones.md) | Apps cliente por organización, clúster orderer, acceso del cliente final y política OR de garantías |
