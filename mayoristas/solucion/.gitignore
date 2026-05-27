@@ -20,3 +20,9 @@ chaincode/*/go.sum
 
 # Node modules
 application/node_modules/
+
+# Binarios y artefactos descargados por install-fabric.sh
+bin/
+builders/
+config/
+install-fabric.sh

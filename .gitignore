@@ -20,3 +20,9 @@ __pycache__/
 *.bak
 *.backup
 *.old
+
+# Binarios y artefactos descargados por install-fabric.sh (raíz del repo)
+/bin/
+/builders/
+/config/
+/install-fabric.sh

@@ -134,11 +134,23 @@ which peer configtxgen osnadmin fabric-ca-client
   ```bash
   curl -sSLO https://raw.githubusercontent.com/hyperledger/fabric/main/scripts/install-fabric.sh
   chmod +x install-fabric.sh
-  ./install-fabric.sh --fabric-version 2.5.9 --ca-version 1.5.7 binary
+  # 'binary' descarga peer/configtxgen/osnadmin/fabric-ca-client
+  # 'docker' descarga las imágenes (peer, orderer, ca, ccenv, baseos)
+  ./install-fabric.sh --fabric-version 2.5.9 --ca-version 1.5.7 binary docker
   # Esto crea ./bin y ./config en el directorio actual
 
   export PATH="$(pwd)/bin:$PATH"
   export FABRIC_CFG_PATH="$(pwd)/config"
+  ```
+
+  Si ya lo ejecutaste con solo `binary`, descarga las imágenes ahora:
+  ```bash
+  docker pull hyperledger/fabric-peer:2.5
+  docker pull hyperledger/fabric-orderer:2.5
+  docker pull hyperledger/fabric-ca:1.5
+  docker pull hyperledger/fabric-ccenv:2.5       # build env de chaincodes
+  docker pull hyperledger/fabric-baseos:2.5      # runtime de chaincodes
+  docker pull couchdb:3.3
   ```
 
 Verifica que todo está en su sitio:
