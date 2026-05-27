@@ -20,6 +20,9 @@ bash scripts/02-build-msps.sh         # Construye organizations/
 bash scripts/03-start-network.sh      # Orderer + 3 peers + 3 CouchDBs
 bash scripts/04-create-channels.sh    # 3 canales + peer join
 bash scripts/05-deploy-chaincodes.sh  # 3 chaincodes (4 despliegues)
+
+# Verificar que todo funciona
+bash scripts/sanity-check.sh          # 9 fases de comprobación
 ```
 
 ## Canales y chaincodes
@@ -46,6 +49,28 @@ bash scripts/05-deploy-chaincodes.sh  # 3 chaincodes (4 despliegues)
 | CouchDB fabricante | 5984 |
 | CouchDB mayorista | 7984 |
 | CouchDB minorista | 9984 |
+
+## Verificación (sanity check)
+
+Tras ejecutar los scripts 01 a 05, comprueba que todo está operativo:
+
+```bash
+bash scripts/sanity-check.sh
+```
+
+El script ejecuta 9 fases:
+
+1. Contenedores Docker (11 esperados) en estado `running`
+2. 12 puertos TCP accesibles
+3. Las 4 CAs responden por HTTPS
+4. Los 3 CouchDB responden
+5. Material criptográfico: certs TLS, claves y MSPs de peers, orderer y admins
+6. Orderer unido a los 3 canales
+7. Cada peer está en sus canales correctos
+8. Los 4 despliegues de chaincode están commiteados
+9. Test end-to-end: registrar producto, consultar desde otra org, transferir custodia, verificar trazabilidad y test de control de acceso (ACL)
+
+Salida: contadores PASS / WARN / FAIL. Exit code 0 si 0 errores.
 
 ## Limpiar todo
 
@@ -76,5 +101,6 @@ solucion/
     ├── 03-start-network.sh
     ├── 04-create-channels.sh
     ├── 05-deploy-chaincodes.sh
+    ├── sanity-check.sh
     └── 99-clean-all.sh
 ```
