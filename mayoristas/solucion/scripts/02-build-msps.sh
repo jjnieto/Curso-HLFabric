@@ -5,6 +5,21 @@
 
 source "$(dirname "$0")/common.sh"
 
+# Copia el fichero más reciente que matchee el glob al fichero destino.
+# Necesario porque keystore/ y signcerts/ pueden tener más de un fichero
+# si se re-enrolla una identidad (cada enroll deja una clave nueva).
+cp_latest_to_file() {
+    local src_glob="$1" dest="$2"
+    local latest
+    # shellcheck disable=SC2086
+    latest=$(ls -t $src_glob 2>/dev/null | head -1)
+    if [ -z "$latest" ]; then
+        log_err "No hay archivos que coincidan con: $src_glob"
+        exit 1
+    fi
+    cp "$latest" "$dest"
+}
+
 build_org_msp_yaml() {
     local org_msp_dir="$1"
     local cacert
@@ -53,10 +68,10 @@ build_peer_org() {
     cp "$tls_ca_root/"*                                    "$peer_dir/msp/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$peer_dir/msp/config.yaml"
 
-    # TLS del peer
-    cp "$tls_ca_root/"*                                         "$peer_dir/tls/ca.crt"
-    cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/keystore/"*   "$peer_dir/tls/server.key"
-    cp "$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/signcerts/"*  "$peer_dir/tls/server.crt"
+    # TLS del peer (destino = fichero → seleccionamos el más reciente)
+    cp_latest_to_file "$tls_ca_root/*"                                         "$peer_dir/tls/ca.crt"
+    cp_latest_to_file "$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/keystore/*"   "$peer_dir/tls/server.key"
+    cp_latest_to_file "$NETWORK_DIR/fabric-ca/$org/peer0/tls/msp/signcerts/*"  "$peer_dir/tls/server.crt"
 
     # MSP local del admin
     local admin_dir="$org_dir/users/Admin@$domain/msp"
@@ -92,9 +107,9 @@ build_orderer_org() {
     cp "$tls_ca_root/"*                                         "$ord_dir/msp/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$ord_dir/msp/config.yaml"
 
-    cp "$tls_ca_root/"*                                              "$ord_dir/tls/ca.crt"
-    cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/keystore/"*   "$ord_dir/tls/server.key"
-    cp "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/signcerts/"*  "$ord_dir/tls/server.crt"
+    cp_latest_to_file "$tls_ca_root/*"                                              "$ord_dir/tls/ca.crt"
+    cp_latest_to_file "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/keystore/*"   "$ord_dir/tls/server.key"
+    cp_latest_to_file "$NETWORK_DIR/fabric-ca/orderer/orderer/tls/msp/signcerts/*"  "$ord_dir/tls/server.crt"
 
     local admin_dir="$org_dir/users/Admin@$domain/msp"
     cp "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/cacerts/"*   "$admin_dir/cacerts/"
