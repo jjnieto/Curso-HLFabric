@@ -149,7 +149,41 @@ fabric-ca-client version
 ls "$FABRIC_CFG_PATH/core.yaml"
 ```
 
-### 4. Levantar la red
+### 4. Instalar Go
+
+El script de despliegue de chaincodes hace `go mod tidy && go mod vendor` localmente, así que necesitas Go >= 1.21. Comprueba si lo tienes:
+
+```bash
+go version
+```
+
+Si no:
+
+#### Linux (Ubuntu / Debian)
+
+```bash
+sudo apt-get update
+sudo apt-get install -y golang-go
+```
+
+Ubuntu 24.04 trae Go 1.22 en sus repos (compatible). Si necesitas una versión más nueva, descarga el tarball oficial de [go.dev/dl](https://go.dev/dl/).
+
+#### macOS
+
+```bash
+brew install go
+```
+
+#### Windows (WSL2)
+
+Lo mismo que Linux, ejecutado en la terminal de Ubuntu (WSL2):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y golang-go
+```
+
+### 5. Levantar la red
 
 ```bash
 bash scripts/01-setup-cas.sh          # 4 CAs + identidades
