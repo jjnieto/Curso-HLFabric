@@ -20,6 +20,34 @@ cp_latest_to_file() {
     cp "$latest" "$dest"
 }
 
+# Copia al directorio destino la única clave privada del keystore origen que
+# corresponde al cert.pem indicado. Imprescindible cuando hubo re-enrolls:
+# fabric-ca-client deja claves stale en keystore/ y solo una matchea con el
+# cert actual. Coger otra rompe la firma de cualquier transacción.
+cp_matching_key_to_dir() {
+    local src_keystore="$1" src_cert="$2" dest_dir="$3"
+    local cert_pub matched=""
+    cert_pub=$(openssl x509 -in "$src_cert" -pubkey -noout 2>/dev/null)
+    if [ -z "$cert_pub" ]; then
+        log_err "No puedo extraer la clave pública del cert: $src_cert"
+        exit 1
+    fi
+    for k in "$src_keystore"/*_sk; do
+        [ -f "$k" ] || continue
+        local key_pub
+        key_pub=$(openssl ec -in "$k" -pubout 2>/dev/null)
+        if [ "$cert_pub" = "$key_pub" ]; then
+            matched="$k"
+            break
+        fi
+    done
+    if [ -z "$matched" ]; then
+        log_err "Ninguna clave en $src_keystore coincide con $src_cert"
+        exit 1
+    fi
+    cp "$matched" "$dest_dir/"
+}
+
 build_org_msp_yaml() {
     local org_msp_dir="$1"
     local cacert
@@ -63,8 +91,10 @@ build_peer_org() {
     # MSP local del peer
     local peer_dir="$org_dir/peers/peer0.$domain"
     cp "$NETWORK_DIR/fabric-ca/$org/peer0/msp/cacerts/"*   "$peer_dir/msp/cacerts/"
-    cp "$NETWORK_DIR/fabric-ca/$org/peer0/msp/keystore/"*  "$peer_dir/msp/keystore/"
     cp "$NETWORK_DIR/fabric-ca/$org/peer0/msp/signcerts/"* "$peer_dir/msp/signcerts/"
+    cp_matching_key_to_dir "$NETWORK_DIR/fabric-ca/$org/peer0/msp/keystore" \
+                           "$peer_dir/msp/signcerts/cert.pem" \
+                           "$peer_dir/msp/keystore"
     cp "$tls_ca_root/"*                                    "$peer_dir/msp/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$peer_dir/msp/config.yaml"
 
@@ -76,8 +106,10 @@ build_peer_org() {
     # MSP local del admin
     local admin_dir="$org_dir/users/Admin@$domain/msp"
     cp "$NETWORK_DIR/fabric-ca/$org/$admin_user/msp/cacerts/"*   "$admin_dir/cacerts/"
-    cp "$NETWORK_DIR/fabric-ca/$org/$admin_user/msp/keystore/"*  "$admin_dir/keystore/"
     cp "$NETWORK_DIR/fabric-ca/$org/$admin_user/msp/signcerts/"* "$admin_dir/signcerts/"
+    cp_matching_key_to_dir "$NETWORK_DIR/fabric-ca/$org/$admin_user/msp/keystore" \
+                           "$admin_dir/signcerts/cert.pem" \
+                           "$admin_dir/keystore"
     cp "$tls_ca_root/"*                                          "$admin_dir/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$admin_dir/config.yaml"
 
@@ -102,8 +134,10 @@ build_orderer_org() {
 
     local ord_dir="$org_dir/orderers/$ORDERER_HOST"
     cp "$NETWORK_DIR/fabric-ca/orderer/orderer/msp/cacerts/"*   "$ord_dir/msp/cacerts/"
-    cp "$NETWORK_DIR/fabric-ca/orderer/orderer/msp/keystore/"*  "$ord_dir/msp/keystore/"
     cp "$NETWORK_DIR/fabric-ca/orderer/orderer/msp/signcerts/"* "$ord_dir/msp/signcerts/"
+    cp_matching_key_to_dir "$NETWORK_DIR/fabric-ca/orderer/orderer/msp/keystore" \
+                           "$ord_dir/msp/signcerts/cert.pem" \
+                           "$ord_dir/msp/keystore"
     cp "$tls_ca_root/"*                                         "$ord_dir/msp/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$ord_dir/msp/config.yaml"
 
@@ -113,8 +147,10 @@ build_orderer_org() {
 
     local admin_dir="$org_dir/users/Admin@$domain/msp"
     cp "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/cacerts/"*   "$admin_dir/cacerts/"
-    cp "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/keystore/"*  "$admin_dir/keystore/"
     cp "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/signcerts/"* "$admin_dir/signcerts/"
+    cp_matching_key_to_dir "$NETWORK_DIR/fabric-ca/orderer/ordereradmin/msp/keystore" \
+                           "$admin_dir/signcerts/cert.pem" \
+                           "$admin_dir/keystore"
     cp "$tls_ca_root/"*                                              "$admin_dir/tlscacerts/"
     cp "$org_dir/msp/config.yaml" "$admin_dir/config.yaml"
 

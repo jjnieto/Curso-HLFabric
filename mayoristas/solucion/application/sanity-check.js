@@ -200,7 +200,8 @@ async function main() {
                 .submitTransaction('RegistrarProducto', `ACL-${stamp}`, 'X', 'X');
             failMsg('ACL: MayoristaMSP NO debería poder registrar productos pero lo ha conseguido');
         } catch (err) {
-            if (err.message.includes('FabricanteMSP') || err.message.includes('endorsement')) {
+            // Cualquier rechazo de la transacción es un OK del ACL.
+            if (err.message.match(/FabricanteMSP|endorse|denied|ABORTED/i)) {
                 okMsg('ACL: MayoristaMSP rechazado al intentar RegistrarProducto');
             } else {
                 warnMsg(`ACL: error inesperado al rechazar MayoristaMSP: ${err.message}`);

@@ -50,6 +50,33 @@ function readSingleFileFrom(dir) {
     return fs.readFileSync(path.join(dir, entries[0]), 'utf8');
 }
 
+// Selecciona la clave privada del keystore que matchea con la clave pública del
+// cert. Necesario porque fabric-ca-client deja una clave nueva en cada
+// re-enroll sin borrar la anterior; coger una al azar rompe la firma de las
+// transacciones.
+function readMatchingPrivateKey(keystoreDir, certPem) {
+    const entries = fs.readdirSync(keystoreDir).filter((f) => !f.startsWith('.'));
+    if (entries.length === 0) {
+        throw new Error(`Keystore vacío: ${keystoreDir}`);
+    }
+    const certPubDer = crypto.createPublicKey(certPem)
+        .export({ type: 'spki', format: 'der' });
+    for (const fname of entries) {
+        const keyPem = fs.readFileSync(path.join(keystoreDir, fname), 'utf8');
+        try {
+            const privKey = crypto.createPrivateKey(keyPem);
+            const pubDer = crypto.createPublicKey(privKey)
+                .export({ type: 'spki', format: 'der' });
+            if (certPubDer.equals(pubDer)) {
+                return keyPem;
+            }
+        } catch (_) { /* archivo no es una clave válida, ignorar */ }
+    }
+    throw new Error(`Ninguna clave en ${keystoreDir} corresponde al cert. ` +
+        `Hay ${entries.length} archivo(s) — probablemente restos de re-enrolls. ` +
+        `Re-ejecuta scripts/02-build-msps.sh para limpiar.`);
+}
+
 // Abre una conexión al peer de la organización indicada.
 // Devuelve un objeto con métodos para obtener contratos en cada canal.
 async function connectAsOrg(org) {
@@ -63,7 +90,7 @@ async function connectAsOrg(org) {
 
     const adminMspPath = path.join(orgsPath, 'users', `Admin@${orgConfig.domain}`, 'msp');
     const certPem = readSingleFileFrom(path.join(adminMspPath, 'signcerts'));
-    const privateKeyPem = readSingleFileFrom(path.join(adminMspPath, 'keystore'));
+    const privateKeyPem = readMatchingPrivateKey(path.join(adminMspPath, 'keystore'), certPem);
 
     const tlsRootCert = fs.readFileSync(path.join(orgsPath, 'peers',
         `peer0.${orgConfig.domain}`, 'tls', 'ca.crt'));
