@@ -106,6 +106,38 @@ node minorista.js activar-garantia SN-001 cliente-juan 24
 node minorista.js verificar-autenticidad SN-001
 ```
 
+## Rellenar la blockchain con datos de demo (`seed-demo.js`)
+
+Para enseñar el prototipo a inversores hace falta datos realistas en la red. El script `seed-demo.js` ejecuta **36 transacciones coherentes** repartidas en 4 historias:
+
+| Historia | Qué cuenta | Estado final |
+|---|---|---|
+| **Catálogo** | 8 productos registrados (laptops, monitores, GPUs) | 8 productos en `canal-trazabilidad` |
+| **P1** | Pedido completo: 2 laptops vendidas al cliente, garantías activas, una reclamación abierta y resuelta | Producto vendido + reclamación cerrada |
+| **P2** | 2 monitores en tránsito al minorista (mayorista ya envió, sin confirmar recepción) | Pedido `ENVIADO` |
+| **P3** | 3 productos pedidos por el mayorista, ya aceptados por el fabricante pero sin envío | Pedido `ACEPTADO` |
+| **P4** | Pedido recién creado, sin aceptar | Pedido `CREADO` |
+
+```bash
+npm run seed                    # genera un prefix único (D{fecha}-{rand})
+SEED_PREFIX=DEMO npm run seed   # prefix fijo (para demos repetibles)
+```
+
+El script imprime al final un **resumen para el presentador**: qué números de serie tienen garantía activa (para escanear desde la vista de Cliente final), y qué pedidos están en cada estado (para enseñar transiciones en vivo).
+
+Para resetear y empezar de cero, hay que limpiar y redesplegar la red entera desde `solucion/`:
+
+```bash
+cd ..
+bash scripts/99-clean-all.sh
+bash scripts/01-setup-cas.sh && bash scripts/02-build-msps.sh && \
+bash scripts/03-start-network.sh && bash scripts/04-create-channels.sh && \
+bash scripts/05-deploy-chaincodes.sh
+cd application && npm run seed
+```
+
+> En blockchain las transacciones no se borran. Cada `npm run seed` añade datos nuevos con un prefix distinto, así puedes acumular varias "tandas" de demo sin conflicto.
+
 ## API REST + Frontend web
 
 El directorio `web/` contiene un servidor Express que sirve **dos cosas**:

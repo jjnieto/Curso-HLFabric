@@ -369,6 +369,7 @@ solucion/
 │   ├── mayorista.js                     # CLI del Mayorista
 │   ├── minorista.js                     # CLI del Minorista
 │   ├── sanity-check.js                  # CLI: flujo end-to-end completo
+│   ├── seed-demo.js                     # Rellena la blockchain con datos de demo
 │   ├── utils/fabric-connection.js       # Gateway compartido
 │   └── web/
 │       ├── server.js                    # API REST (Express) + static

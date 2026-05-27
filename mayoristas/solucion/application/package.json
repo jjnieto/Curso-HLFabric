@@ -9,7 +9,8 @@
     "mayorista": "node mayorista.js",
     "minorista": "node minorista.js",
     "api": "node web/server.js",
-    "api:check": "node web/sanity-check.js"
+    "api:check": "node web/sanity-check.js",
+    "seed": "node seed-demo.js"
   },
   "dependencies": {
     "@hyperledger/fabric-gateway": "^1.5.0",
