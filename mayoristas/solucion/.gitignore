@@ -1,0 +1,22 @@
+# Datos generados por las CAs
+network/fabric-ca/fabricante/*
+network/fabric-ca/mayorista/*
+network/fabric-ca/minorista/*
+network/fabric-ca/orderer/*
+!network/fabric-ca/**/.gitkeep
+
+# MSPs construidos
+network/organizations/*
+!network/organizations/.gitkeep
+
+# Bloques génesis
+network/channel-artifacts/*
+!network/channel-artifacts/.gitkeep
+
+# Paquetes de chaincode
+chaincode/*.tar.gz
+chaincode/*/vendor/
+chaincode/*/go.sum
+
+# Node modules
+application/node_modules/

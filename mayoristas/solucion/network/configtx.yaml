@@ -1,0 +1,194 @@
+---
+Organizations:
+  - &OrdererOrg
+    Name: OrdererMSP
+    ID: OrdererMSP
+    MSPDir: organizations/ordererOrganizations/distributech.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+    OrdererEndpoints:
+      - orderer.distributech.com:7050
+
+  - &Fabricante
+    Name: FabricanteMSP
+    ID: FabricanteMSP
+    MSPDir: organizations/peerOrganizations/fabricante.distributech.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('FabricanteMSP.admin', 'FabricanteMSP.peer', 'FabricanteMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('FabricanteMSP.admin', 'FabricanteMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('FabricanteMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('FabricanteMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.fabricante.distributech.com
+        Port: 7051
+
+  - &Mayorista
+    Name: MayoristaMSP
+    ID: MayoristaMSP
+    MSPDir: organizations/peerOrganizations/mayorista.distributech.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('MayoristaMSP.admin', 'MayoristaMSP.peer', 'MayoristaMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('MayoristaMSP.admin', 'MayoristaMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('MayoristaMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('MayoristaMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.mayorista.distributech.com
+        Port: 9051
+
+  - &Minorista
+    Name: MinoristaMSP
+    ID: MinoristaMSP
+    MSPDir: organizations/peerOrganizations/minorista.distributech.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('MinoristaMSP.admin', 'MinoristaMSP.peer', 'MinoristaMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('MinoristaMSP.admin', 'MinoristaMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('MinoristaMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('MinoristaMSP.peer')"
+    AnchorPeers:
+      - Host: peer0.minorista.distributech.com
+        Port: 11051
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_0: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.distributech.com
+        Port: 7050
+        ClientTLSCert: organizations/ordererOrganizations/distributech.com/orderers/orderer.distributech.com/tls/server.crt
+        ServerTLSCert: organizations/ordererOrganizations/distributech.com/orderers/orderer.distributech.com/tls/server.crt
+  Organizations:
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    BlockValidation:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+  Capabilities:
+    <<: *OrdererCapabilities
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Capabilities:
+    <<: *ChannelCapabilities
+
+# ── Perfiles de canal ────────────────────────────────────────────
+# Tres canales con distintas combinaciones de organizaciones.
+Profiles:
+  CanalTrazabilidad:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Fabricante
+        - *Mayorista
+        - *Minorista
+
+  CanalMayorista:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Fabricante
+        - *Mayorista
+
+  CanalMinorista:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *Mayorista
+        - *Minorista
