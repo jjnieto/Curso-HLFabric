@@ -11,6 +11,33 @@ Red Hyperledger Fabric con 3 organizaciones (Fabricante, Mayorista, Minorista), 
 
 ## Quickstart
 
+### 1. Obtener solo esta carpeta
+
+Si no quieres clonar el repo entero, tienes dos opciones:
+
+**Opción A — tarball (rápido, sin `.git`):**
+
+```bash
+curl -L https://github.com/jjnieto/Curso-HLFabric/archive/refs/heads/main.tar.gz \
+  | tar xz --strip-components=1 Curso-HLFabric-main/mayoristas/solucion
+cd mayoristas/solucion
+chmod +x scripts/*.sh
+```
+
+**Opción B — sparse checkout (mantiene `git pull`):**
+
+```bash
+git clone --no-checkout --depth 1 --filter=blob:none \
+  https://github.com/jjnieto/Curso-HLFabric.git
+cd Curso-HLFabric
+git sparse-checkout init --cone
+git sparse-checkout set mayoristas/solucion
+git checkout main
+cd mayoristas/solucion
+```
+
+### 2. Levantar la red
+
 ```bash
 export PATH=$HOME/practica01/bin:$PATH
 export FABRIC_CFG_PATH=$HOME/practica01/config
