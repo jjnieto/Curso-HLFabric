@@ -255,26 +255,6 @@ El script ejecuta 9 fases:
 
 Salida: contadores PASS / WARN / FAIL. Exit code 0 si 0 errores.
 
-## Actualizar un chaincode
-
-Fabric soporta upgrade de chaincodes en caliente vía el lifecycle. Para actualizar **un solo chaincode** sin tocar los demás:
-
-```bash
-bash scripts/upgrade-chaincode.sh cc-producto
-```
-
-El script:
-1. Consulta la versión y secuencia actuales en el canal con `peer lifecycle chaincode querycommitted`.
-2. Bumpa la versión minor (1.0 → 1.1) y la secuencia (+1).
-3. Empaqueta, instala en los 3 peers, aprueba con cada org del canal y commitea.
-4. Para `cc-pedido` lo hace en sus dos canales (mayorista y minorista).
-
-Puedes forzar versión o secuencia concretas:
-
-```bash
-NEW_VERSION=2.0 NEW_SEQUENCE=5 bash scripts/upgrade-chaincode.sh cc-garantia
-```
-
 ## Limpiar todo
 
 ```bash
