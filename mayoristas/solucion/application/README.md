@@ -142,19 +142,19 @@ cd application && npm run seed
 
 El directorio `web/` contiene un servidor Express que sirve **dos cosas**:
 
-1. La **API REST** con todas las operaciones de las 3 orgs + endpoints públicos para el cliente final.
-2. Un **frontend visual** (`public/`) con role switcher, formularios por rol y la verificación QR-style del cliente final.
+1. La **API REST** con todas las operaciones de las 3 orgs + endpoints públicos para el cliente final + endpoints agregados de dashboard (`/api/dashboard`, `/api/pedido/:id`, `/api/producto/:serie/detalle`).
+2. Un **frontend visual** (`public/`) con dashboard kanban en la pantalla de inicio, drawers clickables, vistas por rol con formularios y verificación QR-style del cliente final.
 
 ```bash
 npm run api          # arranca el servidor en http://localhost:3000
 npm run api:check    # sanity-check end-to-end vía HTTP
 ```
 
-Después abre [http://localhost:3000](http://localhost:3000) en el navegador.
+Después abre [http://localhost:3000](http://localhost:3000) en el navegador. La página de inicio muestra el estado de toda la red en tiempo real con kanban de pedidos por estado — sin necesidad de conocer ningún identificador.
 
 - **Documentación de la API**: [web/API.md](web/API.md) — referencia completa de endpoints, parámetros, modelos de datos y ejemplos.
 - **Spec OpenAPI 3.0**: [web/openapi.yaml](web/openapi.yaml) — para Swagger UI, Postman, generadores de clientes…
-- **Guía operativa**: [web/README.md](web/README.md) — cómo arrancar, configurar y probar.
+- **Guía operativa y frontend**: [web/README.md](web/README.md) — cómo arrancar, configurar y probar, más descripción del frontend.
 
 ## Variables de entorno
 

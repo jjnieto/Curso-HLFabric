@@ -51,6 +51,7 @@ Ver [API.md](API.md) para la referencia completa con parámetros, payloads, ejem
 | Grupo | Endpoints |
 |---|---|
 | Sistema | `GET /api/health` |
+| Dashboard | 3 GET (`/api/dashboard`, `/api/pedido/:id`, `/api/producto/:serie/detalle`) |
 | Fabricante (`/api/fabricante`) | 5 POST + 2 GET |
 | Mayorista (`/api/mayorista`) | 5 POST + 3 GET |
 | Minorista (`/api/minorista`) | 4 POST + 3 GET |
@@ -58,19 +59,28 @@ Ver [API.md](API.md) para la referencia completa con parámetros, payloads, ejem
 
 ## Frontend
 
-El servidor también sirve un frontend en `public/` (vanilla JS sin build):
+El servidor también sirve un frontend en `public/` (vanilla JS sin build, sin React/CDN):
 
-- **Selector de rol** arriba a la derecha: Fabricante / Mayorista / Minorista / Cliente final.
-- Cada rol tiene su panel con formularios para sus operaciones (color coded), un log de actividad y resultados inline.
-- La vista de **Cliente final** es la "killer demo": el usuario introduce un número de serie y ve en pantalla 3 tarjetas (autenticidad ✓, garantía con fechas, trayectoria como timeline vertical con cada transferencia).
+- **Pestañas de navegación**: Inicio (dashboard) / Fabricante / Mayorista / Minorista / Cliente final.
+- **Inicio (dashboard)** — vista por defecto al cargar:
+  - Stats agregadas: nº de productos, pedidos, garantías, reclamaciones.
+  - **Kanban de pedidos** por estado (CREADO / ACEPTADO / ENVIADO / RECIBIDO), con cards clickables.
+  - Grid de productos del catálogo, garantías y reclamaciones, todos clickables.
+  - Botón "Refrescar" para repuller el ledger sin recargar.
+- **Drawers laterales** al hacer clic en una tarjeta:
+  - Drawer de pedido: estado, partes, líneas (clic → drawer del producto), timeline de transiciones.
+  - Drawer de producto: estado, trazabilidad (cadena de custodia con `txID`), garantía si existe.
+  - Cerrar con overlay, ✕ o tecla `Esc`.
+- **Vistas por rol** (Fabricante, Mayorista, Minorista) — formularios para cada operación con colores por rol, log de actividad y resultado inline. **No requiere conocer los IDs**: todo se descubre desde el dashboard.
+- **Cliente final** — vista de "QR del producto": buscador grande + tres tarjetas (autenticidad ✓, garantía con fechas, trayectoria como timeline vertical con cada transferencia).
 
 Estructura del frontend:
 
 ```
 public/
-├── index.html      # Estructura
+├── index.html      # Estructura (topbar, main, drawer, toast)
 ├── styles.css      # Diseño moderno con variables CSS por rol
-└── app.js          # Lógica de vistas, fetch() a la API y verificación pública
+└── app.js          # Router de vistas, fetch() a la API, dashboard, drawers
 ```
 
 ## Notas

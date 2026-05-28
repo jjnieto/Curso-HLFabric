@@ -19,6 +19,7 @@ La API expone las operaciones de las tres organizaciones de la red Fabric (**Fab
 - [Modelo de datos](#modelo-de-datos)
 - **Endpoints**
   - [Sistema](#sistema)
+  - [Dashboard (agregados)](#dashboard-agregados)
   - [Fabricante](#fabricante)
   - [Mayorista](#mayorista)
   - [Minorista](#minorista)
@@ -203,6 +204,148 @@ Health check del servidor. Útil para load balancers y monitorización.
 
 ```bash
 curl http://localhost:3000/api/health
+```
+
+---
+
+## Dashboard (agregados)
+
+Endpoints diseñados para alimentar la vista de dashboard del frontend. Devuelven listados completos de los recursos del ledger usando CouchDB rich queries. Internamente se ejecutan con la identidad del Mayorista (la única org que pertenece a los 3 canales).
+
+> **Disponibles a partir de**: cc-producto v1.2, cc-garantia v1.1, cc-pedido v1.1 (introdujeron las funciones `Listar*` con `GetQueryResult` y filtro por `docType`).
+
+### `GET /api/dashboard`
+
+Devuelve el estado agregado de toda la red en una sola llamada (5 queries internas en paralelo). Pensado para la vista de inicio del frontend.
+
+**Respuesta** — `200 OK`
+
+```json
+{
+  "productos": [
+    {
+      "docType": "producto",
+      "numeroSerie": "SN-1234",
+      "modelo": "Aurora Pro 14",
+      "lote": "LP-2026-Q1",
+      "fechaFabricacion": "2026-05-27T16:20:00+02:00",
+      "propietarioActual": "MinoristaMSP",
+      "estado": "EN_TRANSITO"
+    }
+  ],
+  "pedidosMayorista": [
+    { "id": "PMA-001", "estado": "RECIBIDO", "comprador": "MayoristaMSP", ... }
+  ],
+  "pedidosMinorista": [
+    { "id": "PMI-001", "estado": "ENVIADO", "comprador": "MinoristaMSP", ... }
+  ],
+  "garantias": [
+    { "numeroSerie": "SN-1234", "clienteFinal": "ana@example.com", "estado": "ACTIVA", ... }
+  ],
+  "reclamaciones": [
+    { "id": "REC~SN-1234~abc...", "numeroSerie": "SN-1234", "estado": "ACEPTADA", ... }
+  ]
+}
+```
+
+Cada array es la lista completa del recurso correspondiente, ordenado por inserción. La paginación se hará en una versión futura si fuera necesario.
+
+**Ejemplo**
+
+```bash
+curl http://localhost:3000/api/dashboard
+```
+
+---
+
+### `GET /api/pedido/:id`
+
+Consulta un pedido por su ID **auto-detectando el canal** donde vive (canal-mayorista o canal-minorista). Útil cuando el cliente no sabe a qué canal pertenece, típicamente desde la UI tras un clic en una tarjeta del kanban.
+
+**Parámetros de ruta**
+
+| Nombre | Tipo | Descripción |
+|---|---|---|
+| `id` | string | Identificador del pedido |
+
+**Respuesta** — `200 OK` (objeto [`Pedido`](#pedido) + campo extra `canal`)
+
+```json
+{
+  "docType": "pedido",
+  "id": "PMA-001",
+  "comprador": "MayoristaMSP",
+  "vendedor": "FabricanteMSP",
+  "lineas": [...],
+  "estado": "RECIBIDO",
+  "fechaCreacion": "...",
+  "fechaActualizacion": "...",
+  "canal": "canal-mayorista"
+}
+```
+
+**Errores**
+
+| Código | Razón |
+|---|---|
+| `404` | El pedido no existe en ninguno de los 2 canales |
+
+**Ejemplo**
+
+```bash
+curl http://localhost:3000/api/pedido/PMA-001
+```
+
+---
+
+### `GET /api/producto/:serie/detalle`
+
+Devuelve el detalle completo de un producto en una sola llamada: estado actual, historial de custodia y garantía si existe. Pensado para el drawer de detalle del frontend.
+
+**Parámetros de ruta**
+
+| Nombre | Tipo | Descripción |
+|---|---|---|
+| `serie` | string | Número de serie del producto |
+
+**Respuesta** — `200 OK`
+
+```json
+{
+  "producto": {
+    "docType": "producto",
+    "numeroSerie": "SN-1234",
+    "modelo": "Aurora Pro 14",
+    "lote": "LP-2026-Q1",
+    "fechaFabricacion": "...",
+    "propietarioActual": "MinoristaMSP",
+    "estado": "EN_TRANSITO"
+  },
+  "transferencias": [
+    { "origen": "FabricanteMSP", "destino": "MayoristaMSP", "fecha": "...", "txID": "..." },
+    { "origen": "MayoristaMSP",  "destino": "MinoristaMSP", "fecha": "...", "txID": "..." }
+  ],
+  "garantia": {
+    "estado": "ACTIVA",
+    "clienteFinal": "ana@example.com",
+    "fechaActivacion": "...",
+    "fechaExpiracion": "..."
+  }
+}
+```
+
+El campo `garantia` puede ser `null` si el producto aún no se ha vendido al cliente final.
+
+**Errores**
+
+| Código | Razón |
+|---|---|
+| `404` | El producto no existe |
+
+**Ejemplo**
+
+```bash
+curl http://localhost:3000/api/producto/SN-1234/detalle
 ```
 
 ---

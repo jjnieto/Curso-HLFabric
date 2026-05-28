@@ -13,8 +13,11 @@ Curso HLFabric/
 ├── Modulo 3 - Vision empresarial/
 ├── Modulo 4 - Tokens y Smart Contracts/
 ├── Modulo 5 - Identidad Digital/
-└── Modulo 6 - Proyecto final (FidelityChain)/
+├── Modulo 6 - Proyecto final (FidelityChain)/
+└── mayoristas/    DistribuTech — prototipo de red de distribución
 ```
+
+Además de los módulos del curso, el directorio [`mayoristas/`](mayoristas/) contiene **DistribuTech**, un prototipo de red blockchain para la distribución de tecnología (fabricantes → mayoristas → minoristas → cliente final). Incluye chaincodes en Go, apps cliente Node.js, API REST con frontend web visual y scripts de despliegue. Es el proyecto activo del repositorio y la referencia más actualizada de buenas prácticas.
 
 ## Cómo usar este repositorio
 

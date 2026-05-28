@@ -27,6 +27,8 @@ servers:
 tags:
   - name: Sistema
     description: Endpoints transversales (health, metadatos)
+  - name: Dashboard
+    description: Listados agregados y detalles cruzados pensados para la UI de inicio (kanban + drawers). Usan internamente la identidad del Mayorista (la única presente en los 3 canales).
   - name: Fabricante
     description: Operaciones que ejecuta la organización Fabricante (FabricanteMSP)
   - name: Mayorista
@@ -56,6 +58,63 @@ paths:
               example:
                 status: ok
                 orgs: [fabricante, mayorista, minorista]
+
+  # ── Dashboard ──────────────────────────────────────────────────
+  /api/dashboard:
+    get:
+      tags: [Dashboard]
+      summary: Estado agregado de la red
+      description: |
+        Devuelve productos, pedidos (de los 2 canales), garantías y
+        reclamaciones en una sola llamada. Pensado para alimentar la
+        vista de dashboard del frontend.
+      responses:
+        '200':
+          description: Estado completo de la red
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSnapshot'
+
+  /api/pedido/{id}:
+    get:
+      tags: [Dashboard]
+      summary: Consultar un pedido auto-detectando el canal
+      description: |
+        Intenta primero `canal-mayorista`; si no encuentra el pedido,
+        prueba `canal-minorista`. La respuesta incluye un campo extra
+        `canal` indicando dónde se encontró.
+      parameters:
+        - $ref: '#/components/parameters/PedidoId'
+      responses:
+        '200':
+          description: Pedido encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PedidoConCanal'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/producto/{serie}/detalle:
+    get:
+      tags: [Dashboard]
+      summary: Detalle completo de un producto
+      description: |
+        Devuelve en una sola respuesta el producto, su historial de
+        custodia (transferencias) y su garantía (si existe). Pensado
+        para el drawer de detalle del frontend.
+      parameters:
+        - $ref: '#/components/parameters/Serie'
+      responses:
+        '200':
+          description: Detalle del producto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductoDetalle'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ── Fabricante ─────────────────────────────────────────────────
   /api/fabricante/registrar-producto:
@@ -928,3 +987,59 @@ components:
           type: string
           example: Pantalla defectuosa
       required: [serie, motivo]
+
+    # ── Dashboard schemas ──────────────────────────────────────
+    DashboardSnapshot:
+      type: object
+      description: Estado agregado de toda la red en una sola llamada.
+      properties:
+        productos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Producto'
+        pedidosMayorista:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pedido'
+        pedidosMinorista:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pedido'
+        garantias:
+          type: array
+          items:
+            $ref: '#/components/schemas/Garantia'
+        reclamaciones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reclamacion'
+      required: [productos, pedidosMayorista, pedidosMinorista, garantias, reclamaciones]
+
+    PedidoConCanal:
+      description: Igual que `Pedido` pero añade el canal donde se encontró.
+      allOf:
+        - $ref: '#/components/schemas/Pedido'
+        - type: object
+          properties:
+            canal:
+              type: string
+              enum: [canal-mayorista, canal-minorista]
+              example: canal-mayorista
+          required: [canal]
+
+    ProductoDetalle:
+      type: object
+      description: Producto + trazabilidad + garantía en una respuesta.
+      properties:
+        producto:
+          $ref: '#/components/schemas/Producto'
+        transferencias:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransferenciaCustodia'
+        garantia:
+          allOf:
+            - $ref: '#/components/schemas/Garantia'
+          nullable: true
+          description: '`null` si el producto aún no se ha vendido al cliente final.'
+      required: [producto, transferencias]
