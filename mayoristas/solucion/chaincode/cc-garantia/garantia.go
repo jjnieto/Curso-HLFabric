@@ -73,6 +73,54 @@ func (c *GarantiaContract) ActivarGarantia(ctx contractapi.TransactionContextInt
 	return nil
 }
 
+// ListarGarantias devuelve todas las garantías del canal.
+func (c *GarantiaContract) ListarGarantias(ctx contractapi.TransactionContextInterface) ([]*Garantia, error) {
+	queryString := `{"selector":{"docType":"garantia"}}`
+	iterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		return nil, fmt.Errorf("error listando garantías: %v", err)
+	}
+	defer iterator.Close()
+
+	var garantias []*Garantia
+	for iterator.HasNext() {
+		result, err := iterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("error iterando garantías: %v", err)
+		}
+		var g Garantia
+		if err := json.Unmarshal(result.Value, &g); err != nil {
+			return nil, fmt.Errorf("error deserializando garantía: %v", err)
+		}
+		garantias = append(garantias, &g)
+	}
+	return garantias, nil
+}
+
+// ListarReclamaciones devuelve todas las reclamaciones del canal.
+func (c *GarantiaContract) ListarReclamaciones(ctx contractapi.TransactionContextInterface) ([]*Reclamacion, error) {
+	queryString := `{"selector":{"docType":"reclamacion"}}`
+	iterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		return nil, fmt.Errorf("error listando reclamaciones: %v", err)
+	}
+	defer iterator.Close()
+
+	var reclamaciones []*Reclamacion
+	for iterator.HasNext() {
+		result, err := iterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("error iterando reclamaciones: %v", err)
+		}
+		var r Reclamacion
+		if err := json.Unmarshal(result.Value, &r); err != nil {
+			return nil, fmt.Errorf("error deserializando reclamación: %v", err)
+		}
+		reclamaciones = append(reclamaciones, &r)
+	}
+	return reclamaciones, nil
+}
+
 // ConsultarGarantia devuelve el estado de la garantía de un producto.
 func (c *GarantiaContract) ConsultarGarantia(ctx contractapi.TransactionContextInterface, numeroSerie string) (*Garantia, error) {
 	key := "GAR~" + numeroSerie

@@ -706,10 +706,412 @@ function formatDate(iso) {
     } catch { return iso; }
 }
 
+// ══════════════════════════════════════════════════════════════
+//   DASHBOARD — kanban + secciones agregadas + drawer de detalle
+// ══════════════════════════════════════════════════════════════
+function fmtMoney(n) {
+    if (n == null || isNaN(n)) return '—';
+    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n);
+}
+function pedidoImporte(p) {
+    if (!Array.isArray(p.lineas)) return 0;
+    return p.lineas.reduce((sum, l) => sum + (l.cantidad || 0) * (l.precio || 0), 0);
+}
+function pedidoUnidades(p) {
+    if (!Array.isArray(p.lineas)) return 0;
+    return p.lineas.reduce((sum, l) => sum + (l.cantidad || 0), 0);
+}
+
+async function renderDashboard() {
+    document.body.dataset.role = 'dashboard';
+    document.getElementById('main').innerHTML = `
+    <div class="dashboard-hero">
+        <div>
+            <h1>Tu blockchain en vivo</h1>
+            <p>Vista agregada del estado de la red en tiempo real. Haz clic en cualquier tarjeta para ver el detalle.</p>
+        </div>
+        <button class="dashboard-refresh" id="dashboard-refresh" type="button">
+            <span>↻</span> Refrescar
+        </button>
+    </div>
+    <div id="dashboard-body">
+        <p style="text-align:center; color:var(--text-muted); padding:60px 0;">Cargando datos del ledger…</p>
+    </div>`;
+
+    document.getElementById('dashboard-refresh').addEventListener('click', () => loadDashboard(true));
+    await loadDashboard(false);
+}
+
+async function loadDashboard(showToast) {
+    const body = document.getElementById('dashboard-body');
+    const refreshBtn = document.getElementById('dashboard-refresh');
+    if (refreshBtn) refreshBtn.disabled = true;
+    try {
+        const data = await api('GET', '/api/dashboard');
+        renderDashboardBody(body, data);
+        if (showToast) toast('Datos actualizados');
+    } catch (err) {
+        body.innerHTML = `<p style="text-align:center; color:var(--c-danger); padding:40px;">
+            Error cargando dashboard: ${escapeHtml(err.message)}</p>`;
+    } finally {
+        if (refreshBtn) refreshBtn.disabled = false;
+    }
+}
+
+function renderDashboardBody(container, data) {
+    const todosLosPedidos = [
+        ...data.pedidosMayorista.map(p => ({ ...p, canal: 'mayorista' })),
+        ...data.pedidosMinorista.map(p => ({ ...p, canal: 'minorista' })),
+    ];
+    const reclamacionesAbiertas = data.reclamaciones.filter(r => r.estado === 'ABIERTA').length;
+
+    container.innerHTML = `
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-label">Productos</div>
+            <div class="stat-value">${data.productos.length}</div>
+            <div class="stat-sub">en el catálogo</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Pedidos</div>
+            <div class="stat-value">${todosLosPedidos.length}</div>
+            <div class="stat-sub">${data.pedidosMayorista.length} mayorista · ${data.pedidosMinorista.length} minorista</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Garantías</div>
+            <div class="stat-value">${data.garantias.length}</div>
+            <div class="stat-sub">activadas</div>
+        </div>
+        <div class="stat">
+            <div class="stat-label">Reclamaciones</div>
+            <div class="stat-value">${data.reclamaciones.length}</div>
+            <div class="stat-sub">${reclamacionesAbiertas} abierta${reclamacionesAbiertas === 1 ? '' : 's'}</div>
+        </div>
+    </div>
+
+    <div class="section-header">
+        <h2>Pedidos por estado</h2>
+        <span class="section-sub">${todosLosPedidos.length} pedidos · clic para ver detalle</span>
+    </div>
+    ${renderKanban(todosLosPedidos)}
+
+    <div class="section-header">
+        <h2>Productos en catálogo</h2>
+        <span class="section-sub">${data.productos.length} unidades</span>
+    </div>
+    ${renderProductosGrid(data.productos)}
+
+    <div class="section-header">
+        <h2>Garantías</h2>
+        <span class="section-sub">${data.garantias.length} activadas</span>
+    </div>
+    ${renderGarantiasGrid(data.garantias)}
+
+    ${data.reclamaciones.length > 0 ? `
+        <div class="section-header">
+            <h2>Reclamaciones</h2>
+            <span class="section-sub">${data.reclamaciones.length} en total</span>
+        </div>
+        ${renderReclamacionesGrid(data.reclamaciones)}
+    ` : ''}`;
+
+    // Click en card de pedido
+    container.querySelectorAll('.card-pedido').forEach(el => {
+        el.addEventListener('click', () => openPedidoDrawer(el.dataset.id));
+    });
+    // Click en producto
+    container.querySelectorAll('.card-producto').forEach(el => {
+        el.addEventListener('click', () => openProductoDrawer(el.dataset.serie));
+    });
+    // Click en garantía → muestra el producto
+    container.querySelectorAll('.card-garantia').forEach(el => {
+        el.addEventListener('click', () => openProductoDrawer(el.dataset.serie));
+    });
+    // Click en reclamación → muestra el producto asociado
+    container.querySelectorAll('.card-reclamacion').forEach(el => {
+        el.addEventListener('click', () => openProductoDrawer(el.dataset.serie));
+    });
+}
+
+function renderKanban(pedidos) {
+    const ESTADOS = ['CREADO', 'ACEPTADO', 'ENVIADO', 'RECIBIDO'];
+    const cols = ESTADOS.map(estado => {
+        const items = pedidos
+            .filter(p => p.estado === estado)
+            .sort((a, b) => (b.fechaActualizacion || '').localeCompare(a.fechaActualizacion || ''));
+        return `
+        <div class="kanban-col" data-state="${estado}">
+            <div class="kanban-col-header">
+                <span class="kanban-col-title">
+                    <span class="pill-state"></span>${estado}
+                </span>
+                <span class="kanban-col-count">${items.length}</span>
+            </div>
+            <div class="kanban-cards">
+                ${items.length === 0
+                    ? '<div class="kanban-empty">—</div>'
+                    : items.map(p => renderPedidoCard(p)).join('')}
+            </div>
+        </div>`;
+    }).join('');
+    return `<div class="kanban">${cols}</div>`;
+}
+
+function renderPedidoCard(p) {
+    const flow = p.canal === 'mayorista'
+        ? `<strong>Mayorista</strong> → Fabricante`
+        : `<strong>Minorista</strong> → Mayorista`;
+    return `
+    <div class="card-pedido" data-id="${escapeHtml(p.id)}">
+        <div class="card-pedido-head">
+            <span class="card-pedido-id" title="${escapeHtml(p.id)}">${escapeHtml(p.id)}</span>
+            <span class="card-pedido-channel ${p.canal}">${p.canal}</span>
+        </div>
+        <div class="card-pedido-flow">${flow}</div>
+        <div class="card-pedido-meta">
+            <span class="lines">${pedidoUnidades(p)} ud · ${p.lineas?.length || 0} línea${p.lineas?.length === 1 ? '' : 's'}</span>
+            <span class="total">${fmtMoney(pedidoImporte(p))}</span>
+        </div>
+    </div>`;
+}
+
+function renderProductosGrid(productos) {
+    if (productos.length === 0) {
+        return '<p style="color:var(--text-muted); padding:16px 0;">Sin productos en el catálogo.</p>';
+    }
+    return `<div class="cards-grid">${productos
+        .sort((a, b) => (b.fechaFabricacion || '').localeCompare(a.fechaFabricacion || ''))
+        .map(p => `
+            <div class="card-mini card-producto" data-serie="${escapeHtml(p.numeroSerie)}">
+                <div class="card-mini-head">
+                    <span>${escapeHtml(p.numeroSerie)}</span>
+                    <span class="badge badge-${p.estado}">${p.estado.replace('_', ' ')}</span>
+                </div>
+                <div class="card-mini-title">${escapeHtml(p.modelo)}</div>
+                <div class="card-mini-sub">Lote ${escapeHtml(p.lote)} · ${escapeHtml(p.propietarioActual)}</div>
+            </div>
+        `).join('')}</div>`;
+}
+
+function renderGarantiasGrid(garantias) {
+    if (garantias.length === 0) {
+        return '<p style="color:var(--text-muted); padding:16px 0;">Aún no se han activado garantías.</p>';
+    }
+    return `<div class="cards-grid">${garantias
+        .sort((a, b) => (b.fechaActivacion || '').localeCompare(a.fechaActivacion || ''))
+        .map(g => `
+            <div class="card-mini card-garantia" data-serie="${escapeHtml(g.numeroSerie)}">
+                <div class="card-mini-head">
+                    <span>${escapeHtml(g.numeroSerie)}</span>
+                    <span class="badge badge-${g.estado}">${g.estado}</span>
+                </div>
+                <div class="card-mini-title" style="font-size:13px; font-weight:500;">${escapeHtml(g.clienteFinal)}</div>
+                <div class="card-mini-sub">Hasta ${formatDate(g.fechaExpiracion)}</div>
+            </div>
+        `).join('')}</div>`;
+}
+
+function renderReclamacionesGrid(reclamaciones) {
+    return `<div class="cards-grid">${reclamaciones
+        .sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))
+        .map(r => `
+            <div class="card-mini card-reclamacion" data-serie="${escapeHtml(r.numeroSerie)}">
+                <div class="card-mini-head">
+                    <span>${escapeHtml(r.numeroSerie)}</span>
+                    <span class="badge badge-${r.estado}">${r.estado}</span>
+                </div>
+                <div class="card-mini-title" style="font-size:13px; font-weight:500;">${escapeHtml(r.motivo)}</div>
+                <div class="card-mini-sub">${formatDate(r.fecha)}${r.resolucion ? ' · ' + escapeHtml(r.resolucion) : ''}</div>
+            </div>
+        `).join('')}</div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//   DRAWER — detalle de pedido/producto
+// ══════════════════════════════════════════════════════════════
+function showDrawer(html) {
+    document.getElementById('drawer-content').innerHTML = html;
+    document.getElementById('drawer').hidden = false;
+    document.getElementById('drawer-overlay').hidden = false;
+    requestAnimationFrame(() => {
+        document.getElementById('drawer').classList.add('open');
+        document.getElementById('drawer-overlay').classList.add('open');
+        document.body.classList.add('drawer-open');
+    });
+}
+function closeDrawer() {
+    const drawer = document.getElementById('drawer');
+    const overlay = document.getElementById('drawer-overlay');
+    drawer.classList.remove('open');
+    overlay.classList.remove('open');
+    document.body.classList.remove('drawer-open');
+    setTimeout(() => { drawer.hidden = true; overlay.hidden = true; }, 250);
+}
+
+async function openPedidoDrawer(pedidoId) {
+    showDrawer(`<p style="text-align:center; color:var(--text-muted); padding:60px 0;">Cargando pedido…</p>`);
+    try {
+        const p = await api('GET', `/api/pedido/${encodeURIComponent(pedidoId)}`);
+        const importe = pedidoImporte(p);
+        const flow = p.canal === 'canal-mayorista'
+            ? 'Mayorista → Fabricante'
+            : 'Minorista → Mayorista';
+        showDrawer(`
+            <div class="drawer-header">
+                <div>
+                    <h2>${escapeHtml(p.id)}</h2>
+                    <p>${flow} · ${p.canal}</p>
+                </div>
+                <button class="drawer-close" onclick="closeDrawer()" aria-label="Cerrar">×</button>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Estado</h3>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span class="badge badge-${p.estado}" style="font-size:12px; padding:4px 12px;">${p.estado}</span>
+                    <span style="color:var(--text-muted); font-size:13px;">${formatDate(p.fechaActualizacion)}</span>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Partes</h3>
+                <dl class="kv">
+                    <dt>Comprador</dt><dd>${escapeHtml(p.comprador || '—')}</dd>
+                    <dt>Vendedor</dt><dd>${escapeHtml(p.vendedor || 'pendiente de aceptar')}</dd>
+                    ${p.tracking ? `<dt>Tracking</dt><dd>${escapeHtml(p.tracking)}</dd>` : ''}
+                    <dt>Creado</dt><dd>${formatDate(p.fechaCreacion)}</dd>
+                </dl>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Líneas (${p.lineas?.length || 0})</h3>
+                <div class="drawer-lines">
+                    ${(p.lineas || []).map(l => `
+                        <div class="drawer-lines-line">
+                            <a href="#" data-serie="${escapeHtml(l.producto)}" class="drawer-product-link">${escapeHtml(l.producto)}</a>
+                            <span class="qp">${l.cantidad} × ${fmtMoney(l.precio)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="text-align:right; margin-top:10px; font-size:14px;">
+                    Total: <strong style="font-family:var(--font-mono);">${fmtMoney(importe)}</strong>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Timeline</h3>
+                ${renderPedidoTimeline(p)}
+            </div>
+        `);
+        document.querySelectorAll('.drawer-product-link').forEach(a => {
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                openProductoDrawer(a.dataset.serie);
+            });
+        });
+    } catch (err) {
+        showDrawer(`
+            <div class="drawer-header">
+                <div><h2>Error</h2></div>
+                <button class="drawer-close" onclick="closeDrawer()">×</button>
+            </div>
+            <p style="color:var(--c-danger); padding:16px 0;">${escapeHtml(err.message)}</p>`);
+    }
+}
+
+function renderPedidoTimeline(p) {
+    const ESTADOS = ['CREADO', 'ACEPTADO', 'ENVIADO', 'RECIBIDO'];
+    const currentIdx = ESTADOS.indexOf(p.estado);
+    return `<div class="timeline"><div class="timeline-list">${
+        ESTADOS.map((estado, i) => {
+            const done = i <= currentIdx;
+            const isCurrent = i === currentIdx;
+            const color = done ? 'var(--c-success)' : 'var(--border)';
+            return `
+                <div class="timeline-item" style="opacity:${done ? 1 : 0.4};">
+                    <div class="route" style="font-size:14px;">
+                        ${estado}${isCurrent ? '  ← actual' : ''}
+                    </div>
+                    <div class="time">${i === 0 ? formatDate(p.fechaCreacion) : (done ? formatDate(p.fechaActualizacion) : 'pendiente')}</div>
+                </div>`;
+        }).join('')}</div></div>`;
+}
+
+async function openProductoDrawer(serie) {
+    showDrawer(`<p style="text-align:center; color:var(--text-muted); padding:60px 0;">Cargando producto…</p>`);
+    try {
+        const d = await api('GET', `/api/producto/${encodeURIComponent(serie)}/detalle`);
+        const { producto, transferencias, garantia } = d;
+        showDrawer(`
+            <div class="drawer-header">
+                <div>
+                    <h2>${escapeHtml(producto.numeroSerie)}</h2>
+                    <p>${escapeHtml(producto.modelo)} · lote ${escapeHtml(producto.lote)}</p>
+                </div>
+                <button class="drawer-close" onclick="closeDrawer()">×</button>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Estado actual</h3>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <span class="badge badge-${producto.estado}">${producto.estado.replace('_', ' ')}</span>
+                </div>
+                <dl class="kv">
+                    <dt>Propietario</dt><dd>${escapeHtml(producto.propietarioActual)}</dd>
+                    <dt>Fabricado</dt><dd>${formatDate(producto.fechaFabricacion)}</dd>
+                </dl>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Trazabilidad (${transferencias.length} transferencia${transferencias.length === 1 ? '' : 's'})</h3>
+                <div class="timeline" style="padding:16px;">
+                    <div class="timeline-list">
+                        <div class="timeline-item">
+                            <div class="route">Fabricación · <strong>FabricanteMSP</strong></div>
+                            <div class="time">${formatDate(producto.fechaFabricacion)}</div>
+                        </div>
+                        ${transferencias.map(t => `
+                            <div class="timeline-item">
+                                <div class="route">${escapeHtml(t.origen)} <span class="arrow">→</span> <strong>${escapeHtml(t.destino)}</strong></div>
+                                <div class="time">${formatDate(t.fecha)}</div>
+                                <div class="tx">tx: ${escapeHtml(t.txID || '')}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+
+            <div class="drawer-section">
+                <h3>Garantía</h3>
+                ${garantia ? `
+                    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                        <span class="badge badge-${garantia.estado}">${garantia.estado}</span>
+                    </div>
+                    <dl class="kv">
+                        <dt>Cliente</dt><dd>${escapeHtml(garantia.clienteFinal)}</dd>
+                        <dt>Activada</dt><dd>${formatDate(garantia.fechaActivacion)}</dd>
+                        <dt>Expira</dt><dd>${formatDate(garantia.fechaExpiracion)}</dd>
+                    </dl>
+                ` : '<p style="color:var(--text-muted); font-size:13px;">Sin garantía activada todavía.</p>'}
+            </div>
+        `);
+    } catch (err) {
+        showDrawer(`
+            <div class="drawer-header">
+                <div><h2>Error</h2></div>
+                <button class="drawer-close" onclick="closeDrawer()">×</button>
+            </div>
+            <p style="color:var(--c-danger); padding:16px 0;">${escapeHtml(err.message)}</p>`);
+    }
+}
+
+window.closeDrawer = closeDrawer;
+
 // ──────────────────────────────────────────────────────────────
 //   Router
 // ──────────────────────────────────────────────────────────────
 const RENDERERS = {
+    dashboard: renderDashboard,
     fabricante: renderFabricante,
     mayorista: renderMayorista,
     minorista: renderMinorista,
@@ -721,10 +1123,11 @@ function setRole(role) {
     document.querySelectorAll('.role-tab').forEach(b => {
         b.classList.toggle('active', b.dataset.role === role);
     });
+    closeDrawer();
     if (role && RENDERERS[role]) {
         RENDERERS[role]();
     } else {
-        renderWelcome();
+        renderDashboard();
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -735,8 +1138,14 @@ document.getElementById('role-tabs').addEventListener('click', (e) => {
     if (btn) setRole(btn.dataset.role);
 });
 
+// Click on overlay or Escape to close drawer
+document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDrawer();
+});
+
 // Expose for inline handlers
 window.clearActivity = clearActivity;
 
-// Initial render
-renderWelcome();
+// Initial render: dashboard
+setRole('dashboard');

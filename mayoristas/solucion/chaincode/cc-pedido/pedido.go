@@ -155,6 +155,30 @@ func (c *PedidoContract) ConsultarPedido(ctx contractapi.TransactionContextInter
 	return c.getPedido(ctx, pedidoID)
 }
 
+// ListarPedidos devuelve todos los pedidos del canal.
+func (c *PedidoContract) ListarPedidos(ctx contractapi.TransactionContextInterface) ([]*Pedido, error) {
+	queryString := `{"selector":{"docType":"pedido"}}`
+	iterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		return nil, fmt.Errorf("error listando pedidos: %v", err)
+	}
+	defer iterator.Close()
+
+	var pedidos []*Pedido
+	for iterator.HasNext() {
+		result, err := iterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("error iterando pedidos: %v", err)
+		}
+		var p Pedido
+		if err := json.Unmarshal(result.Value, &p); err != nil {
+			return nil, fmt.Errorf("error deserializando pedido: %v", err)
+		}
+		pedidos = append(pedidos, &p)
+	}
+	return pedidos, nil
+}
+
 func (c *PedidoContract) getPedido(ctx contractapi.TransactionContextInterface, pedidoID string) (*Pedido, error) {
 	data, err := ctx.GetStub().GetState(pedidoID)
 	if err != nil {

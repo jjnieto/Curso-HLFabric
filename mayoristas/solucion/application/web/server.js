@@ -208,6 +208,69 @@ app.get('/api/minorista/pedido/:id', wrap(async (req, res) => {
 }));
 
 // ════════════════════════════════════════════════════════════════
+//   DASHBOARD — listados agregados para la vista kanban
+// ════════════════════════════════════════════════════════════════
+// Usa la identidad del Mayorista (única org presente en los 3 canales)
+// para obtener todo el estado de la red en una llamada.
+
+app.get('/api/dashboard', wrap(async (_req, res) => {
+    const ctxMay = connections.mayorista;
+    const [productos, pedMay, pedMin, garantias, reclamaciones] = await Promise.all([
+        ctxMay.getContract('canal-trazabilidad', 'cc-producto').evaluateTransaction('ListarProductos'),
+        ctxMay.getContract('canal-mayorista',    'cc-pedido')  .evaluateTransaction('ListarPedidos'),
+        ctxMay.getContract('canal-minorista',    'cc-pedido')  .evaluateTransaction('ListarPedidos'),
+        ctxMay.getContract('canal-trazabilidad', 'cc-garantia').evaluateTransaction('ListarGarantias'),
+        ctxMay.getContract('canal-trazabilidad', 'cc-garantia').evaluateTransaction('ListarReclamaciones'),
+    ]);
+    res.json({
+        productos:        decodeJSON(productos) || [],
+        pedidosMayorista: decodeJSON(pedMay) || [],
+        pedidosMinorista: decodeJSON(pedMin) || [],
+        garantias:        decodeJSON(garantias) || [],
+        reclamaciones:    decodeJSON(reclamaciones) || [],
+    });
+}));
+
+// Detalle de un pedido (auto-detecta el canal si no se especifica)
+app.get('/api/pedido/:id', wrap(async (req, res) => {
+    const ctxMay = connections.mayorista;
+    const id = req.params.id;
+    // Probamos primero en canal-mayorista, luego en canal-minorista
+    try {
+        const data = await ctxMay.getContract('canal-mayorista', 'cc-pedido')
+            .evaluateTransaction('ConsultarPedido', id);
+        const pedido = decodeJSON(data);
+        if (pedido) return res.json({ ...pedido, canal: 'canal-mayorista' });
+    } catch (_) { /* intenta otro canal */ }
+    try {
+        const data = await ctxMay.getContract('canal-minorista', 'cc-pedido')
+            .evaluateTransaction('ConsultarPedido', id);
+        const pedido = decodeJSON(data);
+        if (pedido) return res.json({ ...pedido, canal: 'canal-minorista' });
+    } catch (_) { /* nada */ }
+    res.status(404).json({ error: `Pedido ${id} no encontrado` });
+}));
+
+// Detalle completo de un producto: estado + trazabilidad + garantía si existe
+app.get('/api/producto/:serie/detalle', wrap(async (req, res) => {
+    const ctx = connections.mayorista;
+    const serie = req.params.serie;
+    const [productoR, trazaR, garantiaR] = await Promise.allSettled([
+        ctx.getContract('canal-trazabilidad', 'cc-producto').evaluateTransaction('ConsultarProducto', serie),
+        ctx.getContract('canal-trazabilidad', 'cc-producto').evaluateTransaction('VerificarAutenticidad', serie),
+        ctx.getContract('canal-trazabilidad', 'cc-garantia').evaluateTransaction('ConsultarGarantia', serie),
+    ]);
+    if (productoR.status !== 'fulfilled') {
+        return res.status(404).json({ error: `Producto ${serie} no encontrado` });
+    }
+    res.json({
+        producto: decodeJSON(productoR.value),
+        transferencias: trazaR.status === 'fulfilled' ? (decodeJSON(trazaR.value) || []) : [],
+        garantia: garantiaR.status === 'fulfilled' ? decodeJSON(garantiaR.value) : null,
+    });
+}));
+
+// ════════════════════════════════════════════════════════════════
 //   PÚBLICO (cliente final, sin autenticación)
 // ════════════════════════════════════════════════════════════════
 // Usa internamente la identidad del minorista para consultar el ledger.

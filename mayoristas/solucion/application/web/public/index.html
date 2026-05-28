@@ -17,6 +17,10 @@
         </div>
     </div>
     <nav class="role-tabs" id="role-tabs" aria-label="Selecciona tu rol">
+        <button class="role-tab" data-role="dashboard" type="button">
+            <span class="dot dot-dashboard" aria-hidden="true"></span>
+            <span>Inicio</span>
+        </button>
         <button class="role-tab" data-role="fabricante" type="button">
             <span class="dot dot-fabricante" aria-hidden="true"></span>
             <span>Fabricante</span>
@@ -37,6 +41,11 @@
 </header>
 
 <main id="main"></main>
+
+<div id="drawer-overlay" class="drawer-overlay" hidden></div>
+<aside id="drawer" class="drawer" hidden aria-hidden="true">
+    <div class="drawer-content" id="drawer-content"></div>
+</aside>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 

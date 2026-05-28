@@ -130,6 +130,32 @@ func (c *ProductoContract) TransferirCustodia(ctx contractapi.TransactionContext
 	return nil
 }
 
+// ListarProductos devuelve todos los productos registrados en el canal.
+// Usa CouchDB rich query filtrando por docType para no incluir las
+// claves compuestas de transferencias.
+func (c *ProductoContract) ListarProductos(ctx contractapi.TransactionContextInterface) ([]*Producto, error) {
+	queryString := `{"selector":{"docType":"producto"}}`
+	iterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		return nil, fmt.Errorf("error listando productos: %v", err)
+	}
+	defer iterator.Close()
+
+	var productos []*Producto
+	for iterator.HasNext() {
+		result, err := iterator.Next()
+		if err != nil {
+			return nil, fmt.Errorf("error iterando productos: %v", err)
+		}
+		var p Producto
+		if err := json.Unmarshal(result.Value, &p); err != nil {
+			return nil, fmt.Errorf("error deserializando producto: %v", err)
+		}
+		productos = append(productos, &p)
+	}
+	return productos, nil
+}
+
 // ConsultarProducto devuelve el estado actual del producto.
 func (c *ProductoContract) ConsultarProducto(ctx contractapi.TransactionContextInterface, numeroSerie string) (*Producto, error) {
 	data, err := ctx.GetStub().GetState(numeroSerie)
