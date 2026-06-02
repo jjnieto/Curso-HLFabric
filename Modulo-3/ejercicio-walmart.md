@@ -14,6 +14,8 @@ Antes de escribir un solo comando, responde estas preguntas en tu cuaderno.
 
 ### Actores y organizaciones
 
+> 💡 **Por simplicidad se considerará solo una organización por actor.** En un caso real habría muchos productores, muchos distribuidores y muchos supermercados, cada uno como organización Fabric distinta. Aquí, para que la red sea manejable en clase, cada actor del diagrama equivale a una única organización.
+
 ```mermaid
 graph LR
     P["Productor<br/>(granja)"] --> D["Distribuidor<br/>(transporte)"]
