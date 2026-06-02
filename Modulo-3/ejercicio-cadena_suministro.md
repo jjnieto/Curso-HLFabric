@@ -6,7 +6,7 @@ Walmart, junto con IBM, lanzo en 2018 **IBM Food Trust**, una plataforma basada 
 
 Tu misión: diseñar y montar una red Fabric que soporte un caso similar (pero a escala de aula) para trazar **lotes de aguacates** desde el productor hasta el supermercado.
 
----
+\---
 
 ## Fase 1: Diseño sobre el papel
 
@@ -14,11 +14,13 @@ Antes de escribir un solo comando, responde estas preguntas en tu cuaderno.
 
 ### Actores y organizaciones
 
+NOTA: POr simplicidad se asumirá una sola empresa por actor (1 productor, 1 distribuidor y 1 supermercado)
+
 ```mermaid
 graph LR
-    P["Productor<br/>(granja)"] --> D["Distribuidor<br/>(transporte)"]
-    D --> S["Supermercado<br/>(venta)"]
-    R["Regulador<br/>(AESAN)"]
+    P\["Productor<br/>(granja)"] --> D\["Distribuidor<br/>(transporte)"]
+    D --> S\["Supermercado<br/>(venta)"]
+    R\["Regulador<br/>(AESAN)"]
 
     style P fill:#22627E,color:#fff
     style D fill:#B45D09,color:#fff
@@ -47,43 +49,44 @@ graph LR
 ### Políticas de endorsement
 
 12. **¿Que política de endorsement usarias?** Justifica:
-    - `AND(Productor, Distribuidor, Supermercado)` — todos deben aprobar
-    - `OR(Productor, Distribuidor, Supermercado)` — basta con uno
-    - `MAJORITY` — mayoría
-    - Política por state (state-based endorsement)
 
----
+    * `AND(Productor, Distribuidor, Supermercado)` — todos deben aprobar
+    * `OR(Productor, Distribuidor, Supermercado)` — basta con uno
+    * `MAJORITY` — mayoría
+    * Política por state (state-based endorsement)
+
+\---
 
 ## Solución propuesta
 
-> **Intenta responder tu las preguntas antes de leer esto.**
+> \*\*Intenta responder tu las preguntas antes de leer esto.\*\*
 
 ### Topologia de red
 
 ```mermaid
 graph TB
     subgraph "Red FoodTrace"
-        subgraph OrdererOrg["Orderer Org"]
-            ORD["orderer.foodtrace.com<br/>:7050"]
+        subgraph OrdererOrg\["Orderer Org"]
+            ORD\["orderer.foodtrace.com<br/>:7050"]
         end
 
-        subgraph Productor["Productor - ProductorMSP"]
-            P["peer0.productor<br/>:7051"]
+        subgraph Productor\["Productor - ProductorMSP"]
+            P\["peer0.productor<br/>:7051"]
         end
 
-        subgraph Distribuidor["Distribuidor - DistribuidorMSP"]
-            D["peer0.distribuidor<br/>:9051"]
+        subgraph Distribuidor\["Distribuidor - DistribuidorMSP"]
+            D\["peer0.distribuidor<br/>:9051"]
         end
 
-        subgraph Supermercado["Supermercado - SupermercadoMSP"]
-            S["peer0.supermercado<br/>:11051"]
+        subgraph Supermercado\["Supermercado - SupermercadoMSP"]
+            S\["peer0.supermercado<br/>:11051"]
         end
 
-        subgraph Regulador["Regulador - ReguladorMSP"]
-            R["peer0.regulador<br/>:13051"]
+        subgraph Regulador\["Regulador - ReguladorMSP"]
+            R\["peer0.regulador<br/>:13051"]
         end
 
-        CANAL["Canal: trazabilidad-channel"]
+        CANAL\["Canal: trazabilidad-channel"]
 
         ORD --- CANAL
         P --- CANAL
@@ -102,11 +105,11 @@ graph TB
 
 **Decisiones clave:**
 
-- **4 organizaciones + orderer**: Productor, Distribuidor, Supermercado y Regulador (este último como actor con permisos especiales).
-- **1 canal compartido**: todos ven el mismo ledger. La trazabilidad tiene que ser pública dentro del consorcio.
-- **Private Data Collection `priceAgreement`**: compartida solo entre Productor-Distribuidor para precios de compra.
-- **Private Data Collection `wholesalePrice`**: compartida solo entre Distribuidor-Supermercado.
-- **Política de endorsement**: `AND(productor, distribuidor, supermercado)` solo para recall. Para movimientos normales: solo el holder actual endorsa.
+* **4 organizaciones + orderer**: Productor, Distribuidor, Supermercado y Regulador (este último como actor con permisos especiales).
+* **1 canal compartido**: todos ven el mismo ledger. La trazabilidad tiene que ser pública dentro del consorcio.
+* **Private Data Collection `priceAgreement`**: compartida solo entre Productor-Distribuidor para precios de compra.
+* **Private Data Collection `wholesalePrice`**: compartida solo entre Distribuidor-Supermercado.
+* **Política de endorsement**: `AND(productor, distribuidor, supermercado)` solo para recall. Para movimientos normales: solo el holder actual endorsa.
 
 ### Modelo de datos
 
@@ -118,25 +121,25 @@ graph TB
   "origin": "Malaga, Espana",
   "producer": "ProductorMSP",
   "currentHolder": "DistribuidorMSP",
-  "status": "in_transit",
+  "status": "in\_transit",
   "temperature": 6.5,
   "weight": 500.0,
-  "history": [
+  "history": \[
     {"org": "ProductorMSP", "action": "produced", "timestamp": "2026-04-20T08:00:00Z", "location": "Malaga"},
-    {"org": "ProductorMSP", "action": "transferred_to_DistribuidorMSP", "timestamp": "2026-04-20T10:30:00Z", "location": "Malaga"}
+    {"org": "ProductorMSP", "action": "transferred\_to\_DistribuidorMSP", "timestamp": "2026-04-20T10:30:00Z", "location": "Malaga"}
   ]
 }
 ```
 
----
+\---
 
 ## Fase 2: Montar la red
 
 ### Prerequisitos
 
-- Docker y Docker Compose funcionando
-- Binarios de Fabric en el PATH
-- `jq` instalado
+* Docker y Docker Compose funcionando
+* Binarios de Fabric en el PATH
+* `jq` instalado
 
 ```bash
 mkdir -p $HOME/foodtrace/{network,chaincode,channel-artifacts}
@@ -154,28 +157,28 @@ OrdererOrgs:
     EnableNodeOUs: true
     Specs:
       - Hostname: orderer
-        SANS: [localhost, 127.0.0.1]
+        SANS: \[localhost, 127.0.0.1]
 
 PeerOrgs:
   - Name: Productor
     Domain: productor.foodtrace.com
     EnableNodeOUs: true
-    Template: {Count: 1, SANS: [localhost, 127.0.0.1]}
+    Template: {Count: 1, SANS: \[localhost, 127.0.0.1]}
     Users: {Count: 1}
   - Name: Distribuidor
     Domain: distribuidor.foodtrace.com
     EnableNodeOUs: true
-    Template: {Count: 1, SANS: [localhost, 127.0.0.1]}
+    Template: {Count: 1, SANS: \[localhost, 127.0.0.1]}
     Users: {Count: 1}
   - Name: Supermercado
     Domain: supermercado.foodtrace.com
     EnableNodeOUs: true
-    Template: {Count: 1, SANS: [localhost, 127.0.0.1]}
+    Template: {Count: 1, SANS: \[localhost, 127.0.0.1]}
     Users: {Count: 1}
   - Name: Regulador
     Domain: regulador.foodtrace.com
     EnableNodeOUs: true
-    Template: {Count: 1, SANS: [localhost, 127.0.0.1]}
+    Template: {Count: 1, SANS: \[localhost, 127.0.0.1]}
     Users: {Count: 1}
 ```
 
@@ -191,18 +194,18 @@ cryptogen generate --config=crypto-config.yaml --output=crypto-config
 
 ```yaml
 Organizations:
-  - &OrdererOrg
+  - \&OrdererOrg
     Name: OrdererOrg
     ID: OrdererMSP
     MSPDir: crypto-config/ordererOrganizations/foodtrace.com/msp
-    OrdererEndpoints: [orderer.foodtrace.com:7050]
+    OrdererEndpoints: \[orderer.foodtrace.com:7050]
     Policies: {...}
 
-  - &Productor
+  - \&Productor
     Name: ProductorMSP
     ID: ProductorMSP
     MSPDir: crypto-config/peerOrganizations/productor.foodtrace.com/msp
-    AnchorPeers: [{Host: peer0.productor.foodtrace.com, Port: 7051}]
+    AnchorPeers: \[{Host: peer0.productor.foodtrace.com, Port: 7051}]
     Policies: {...}
 
   # Mismo patron para Distribuidor, Supermercado, Regulador
@@ -211,18 +214,18 @@ Profiles:
   TrazabilidadChannel:
     Application:
       Organizations:
-        - *Productor
-        - *Distribuidor
-        - *Supermercado
-        - *Regulador
+        - \*Productor
+        - \*Distribuidor
+        - \*Supermercado
+        - \*Regulador
 ```
 
 Generar bloque génesis:
 
 ```bash
-export FABRIC_CFG_PATH=$PWD
-configtxgen -profile TrazabilidadChannel \
-  -outputBlock ../channel-artifacts/trazabilidad-channel.block \
+export FABRIC\_CFG\_PATH=$PWD
+configtxgen -profile TrazabilidadChannel \\
+  -outputBlock ../channel-artifacts/trazabilidad-channel.block \\
   -channelID trazabilidad-channel
 ```
 
@@ -230,13 +233,13 @@ configtxgen -profile TrazabilidadChannel \
 
 docker-compose con orderer + 4 peers + 4 CouchDB. Ver `docs/03-crear-red-personalizada.md` para la plantilla completa, adaptando puertos:
 
-| Componente | Puerto |
-|-----------|--------|
-| orderer | 7050 |
-| peer productor | 7051 |
-| peer distribuidor | 9051 |
-| peer supermercado | 11051 |
-| peer regulador | 13051 |
+|Componente|Puerto|
+|-|-|
+|orderer|7050|
+|peer productor|7051|
+|peer distribuidor|9051|
+|peer supermercado|11051|
+|peer regulador|13051|
 
 ```bash
 docker compose -f ../docker/docker-compose.yaml up -d
@@ -246,16 +249,16 @@ docker compose -f ../docker/docker-compose.yaml up -d
 
 ```bash
 # Unir orderer al canal
-osnadmin channel join --channelID trazabilidad-channel \
-  --config-block ../channel-artifacts/trazabilidad-channel.block \
-  -o localhost:7053 --ca-file $ORDERER_CA \
-  --client-cert $ORDERER_ADMIN_TLS_CERT \
-  --client-key $ORDERER_ADMIN_TLS_KEY
+osnadmin channel join --channelID trazabilidad-channel \\
+  --config-block ../channel-artifacts/trazabilidad-channel.block \\
+  -o localhost:7053 --ca-file $ORDERER\_CA \\
+  --client-cert $ORDERER\_ADMIN\_TLS\_CERT \\
+  --client-key $ORDERER\_ADMIN\_TLS\_KEY
 
 # Unir cada peer (cambiar variables de entorno para cada org)
 # Productor
-export CORE_PEER_LOCALMSPID=ProductorMSP
-export CORE_PEER_ADDRESS=localhost:7051
+export CORE\_PEER\_LOCALMSPID=ProductorMSP
+export CORE\_PEER\_ADDRESS=localhost:7051
 # ... (ver doc 03 para el patron completo)
 peer channel join -b ../channel-artifacts/trazabilidad-channel.block
 
@@ -264,10 +267,10 @@ peer channel join -b ../channel-artifacts/trazabilidad-channel.block
 
 ### Paso 5: Private Data Collections
 
-Crea `collections_config.json`:
+Crea `collections\_config.json`:
 
 ```json
-[
+\[
   {
     "name": "priceAgreement",
     "policy": "OR('ProductorMSP.member', 'DistribuidorMSP.member')",
@@ -295,28 +298,28 @@ Puedes reutilizar el chaincode `FoodLot` del proyecto FidelityChain (Módulo 6) 
 
 ```bash
 # Empaquetar
-peer lifecycle chaincode package foodtrace.tar.gz \
-  --path ../chaincode/ --lang golang --label foodtrace_1.0
+peer lifecycle chaincode package foodtrace.tar.gz \\
+  --path ../chaincode/ --lang golang --label foodtrace\_1.0
 
 # Instalar en cada peer (4 veces, una por org)
 peer lifecycle chaincode install foodtrace.tar.gz
 
 # Aprobar desde cada org (4 veces) — IMPORTANTE: pasar collections-config
-peer lifecycle chaincode approveformyorg \
-  -o localhost:7050 --ordererTLSHostnameOverride orderer.foodtrace.com \
-  --tls --cafile $ORDERER_CA \
-  --channelID trazabilidad-channel \
-  --name foodtrace --version 1.0 \
-  --package-id $CC_PACKAGE_ID --sequence 1 \
-  --collections-config ./collections_config.json
+peer lifecycle chaincode approveformyorg \\
+  -o localhost:7050 --ordererTLSHostnameOverride orderer.foodtrace.com \\
+  --tls --cafile $ORDERER\_CA \\
+  --channelID trazabilidad-channel \\
+  --name foodtrace --version 1.0 \\
+  --package-id $CC\_PACKAGE\_ID --sequence 1 \\
+  --collections-config ./collections\_config.json
 
 # Commit
-peer lifecycle chaincode commit \
-  --collections-config ./collections_config.json \
+peer lifecycle chaincode commit \\
+  --collections-config ./collections\_config.json \\
   # ... resto de flags
 ```
 
----
+\---
 
 ## Fase 3: Probar el caso
 
@@ -324,42 +327,42 @@ peer lifecycle chaincode commit \
 
 ```bash
 # 1. Como Productor: crear un lote
-peer chaincode invoke ... \
-  -c '{"function":"ProduceLot","Args":["LOT-AGU-2026-001","aguacate","Malaga","500"]}'
+peer chaincode invoke ... \\
+  -c '{"function":"ProduceLot","Args":\["LOT-AGU-2026-001","aguacate","Malaga","500"]}'
 
 # 2. Como Productor: acordar precio privado con Distribuidor
-export PRICE_DATA=$(echo -n '{"price":1500,"currency":"EUR"}' | base64 | tr -d \\n)
-peer chaincode invoke ... \
-  --transient "{\"price\":\"$PRICE_DATA\"}" \
-  -c '{"function":"SetPrivatePrice","Args":["LOT-AGU-2026-001","priceAgreement"]}'
+export PRICE\_DATA=$(echo -n '{"price":1500,"currency":"EUR"}' | base64 | tr -d \\\\n)
+peer chaincode invoke ... \\
+  --transient "{\\"price\\":\\"$PRICE\_DATA\\"}" \\
+  -c '{"function":"SetPrivatePrice","Args":\["LOT-AGU-2026-001","priceAgreement"]}'
 
 # 3. Como Productor: transferir al Distribuidor
-peer chaincode invoke ... \
-  -c '{"function":"TransferLot","Args":["LOT-AGU-2026-001","DistribuidorMSP","Malaga","6.5"]}'
+peer chaincode invoke ... \\
+  -c '{"function":"TransferLot","Args":\["LOT-AGU-2026-001","DistribuidorMSP","Malaga","6.5"]}'
 
 # 4. Como Distribuidor: verificar que tiene el lote
-peer chaincode query -C trazabilidad-channel -n foodtrace \
-  -c '{"Args":["ReadLot","LOT-AGU-2026-001"]}'
+peer chaincode query -C trazabilidad-channel -n foodtrace \\
+  -c '{"Args":\["ReadLot","LOT-AGU-2026-001"]}'
 
 # 5. Como Supermercado: consultar trazabilidad completa
-peer chaincode query -C trazabilidad-channel -n foodtrace \
-  -c '{"Args":["GetLotHistory","LOT-AGU-2026-001"]}'
+peer chaincode query -C trazabilidad-channel -n foodtrace \\
+  -c '{"Args":\["GetLotHistory","LOT-AGU-2026-001"]}'
 
 # 6. Como Regulador: hacer recall de un lote contaminado
-peer chaincode invoke ... \
-  -c '{"function":"RecallLot","Args":["LOT-AGU-2026-001","Contaminacion detectada"]}'
+peer chaincode invoke ... \\
+  -c '{"function":"RecallLot","Args":\["LOT-AGU-2026-001","Contaminacion detectada"]}'
 ```
 
 ### Validar que la privacidad funciona
 
 ```bash
 # Como Supermercado: NO deberia poder leer priceAgreement
-peer chaincode query -C trazabilidad-channel -n foodtrace \
-  -c '{"Args":["GetPrivatePrice","LOT-AGU-2026-001","priceAgreement"]}'
+peer chaincode query -C trazabilidad-channel -n foodtrace \\
+  -c '{"Args":\["GetPrivatePrice","LOT-AGU-2026-001","priceAgreement"]}'
 # Resultado esperado: error "access denied" o datos vacios
 ```
 
----
+\---
 
 ## Preguntas para el debate
 
@@ -369,10 +372,11 @@ peer chaincode query -C trazabilidad-channel -n foodtrace \
 4. ¿Deberia el consumidor final tener acceso? ¿Como?
 5. Si un productor abandona el consorcio, ¿que pasa con sus lotes históricos?
 
----
+\---
 
 ## Referencias
 
-- Chaincode FoodLot: [Módulo 6 Día 4](../../módulo-6/03-chaincode.md) (adaptar el modelo para aguacates)
-- Tutorial de Private Data: [Doc 04 Chaincode Lifecycle](../../04-chaincode-lifecycle.md)
-- Administración: [Doc 06 Operaciones](../../06-operaciones-administración.md)
+* Chaincode FoodLot: [Módulo 6 Día 4](../../módulo-6/03-chaincode.md) (adaptar el modelo para aguacates)
+* Tutorial de Private Data: [Doc 04 Chaincode Lifecycle](../../04-chaincode-lifecycle.md)
+* Administración: [Doc 06 Operaciones](../../06-operaciones-administración.md)
+
