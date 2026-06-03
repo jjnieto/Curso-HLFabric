@@ -266,7 +266,7 @@ configtxgen -profile TrazabilidadChannel \
 
 ### Paso 3: Levantar la red
 
-> ⚠ **NO te doy aquí el `docker-compose-net.yaml` entero.** Tendrás que crearlo en `$HOME/foodtrace/docker/docker-compose-net.yaml` adaptándolo del que aparece en el [doc 06 punto 0.1](../../Modulo%202/06-operaciones-administracion.md).
+> ⚠ **NO te doy aquí el `docker-compose-net.yaml` entero.** Tendrás que crearlo en `$HOME/foodtrace/docker/docker-compose-net.yaml` adaptándolo del que aparece en el [doc 06 punto 0.1](https://github.com/jjnieto/Curso-HLFabric/blob/main/Modulo-2/06-operaciones-administracion.md).
 
 Tu compose debe levantar **9 contenedores** en total: 1 orderer + 4 peers + 4 CouchDB. Tabla de puertos:
 
