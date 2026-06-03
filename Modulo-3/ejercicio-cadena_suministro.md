@@ -199,7 +199,7 @@ cryptogen generate --config=crypto-config.yaml --output=crypto-config
 
 > ⚠ **Este `configtx.yaml` es un ESQUELETO muy resumido.** Los `Policies: {...}` y los bloques marcados como `# PISTA` son lo que tienes que rellenar tú.
 >
-> Como referencia completa de un `configtx.yaml` que SÍ funciona, mira [doc 03 — Crear red personalizada](../../Modulo%202/03-crear-red-personalizada.md) o el punto 0.3.1 del [doc 06 — Operaciones de administración](../../Modulo%202/06-operaciones-administracion.md). Tu configtx será un híbrido: estructura del doc 03/06 + el nombre de tu canal (`trazabilidad-channel`) + las 4 orgs de este ejercicio + el bloque `Consortium` si lo necesitas.
+> Como referencia completa de un `configtx.yaml` que SÍ funciona, mira [doc 03 — Crear red personalizada](../../Modulo%202/03-crear-red-personalizada.md) o el punto 0.3.1 del [doc 06 — Operaciones de administración](https://github.com/jjnieto/Curso-HLFabric/blob/main/Modulo-2/06-operaciones-administracion.md). Tu configtx será un híbrido: estructura del doc 03/06 + el nombre de tu canal (`trazabilidad-channel`) + las 4 orgs de este ejercicio + el bloque `Consortium` si lo necesitas.
 
 ```yaml
 # configtx.yaml — ESQUELETO, está MUY incompleto, úsalo como guía
