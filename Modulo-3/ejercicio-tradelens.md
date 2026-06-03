@@ -46,6 +46,62 @@ graph TB
 
 Esta es la parte más importante del ejercicio. **Antes de tocar un solo comando**, responde estas preguntas en tu cuaderno. No hay una única respuesta correcta — lo que importa es que justifiques cada decisión pensando en por qué TradeLens fracasó.
 
+### Actores y organizaciones
+
+> 💡 **Por simplicidad se considerará solo una organización por actor.** En un caso real habría docenas de navieras, decenas de puertos y varios reguladores aduaneros por jurisdicción, cada uno como organización Fabric distinta. Aquí, para que la red sea manejable en clase, cada actor del diagrama equivale a una única organización.
+
+La red **MaritimeChain** tiene **6 organizaciones** repartidas en tres familias:
+
+```mermaid
+graph LR
+    subgraph Navieras["Navieras (3) — quienes mueven los contenedores"]
+        N1["Maersk<br/>MaerskMSP"]
+        N2["MSC<br/>MSCMSP"]
+        N3["CMA CGM<br/>CMAMSP"]
+    end
+
+    subgraph Puertos["Puertos (2) — quienes los manipulan"]
+        P1["Valencia<br/>ValenciaMSP"]
+        P2["Rotterdam<br/>RotterdamMSP"]
+    end
+
+    subgraph Regulador["Regulador (1) — quien fiscaliza"]
+        A1["Aduanas UE<br/>CustomsMSP"]
+    end
+
+    N1 --> P1
+    N2 --> P2
+    N3 --> P1
+    A1 -.->|inspecciona| N1
+    A1 -.->|inspecciona| N2
+    A1 -.->|inspecciona| N3
+
+    style N1 fill:#22627E,color:#fff
+    style N2 fill:#22627E,color:#fff
+    style N3 fill:#22627E,color:#fff
+    style P1 fill:#0D9448,color:#fff
+    style P2 fill:#0D9448,color:#fff
+    style A1 fill:#EC0000,color:#fff
+```
+
+| Organización  | MSP ID         | Familia        | Rol funcional                                                  |
+|---------------|----------------|----------------|----------------------------------------------------------------|
+| Maersk        | `MaerskMSP`    | Naviera        | Mueve contenedores, registra eventos, participa en transbordos |
+| MSC           | `MSCMSP`       | Naviera        | Mueve contenedores, registra eventos, participa en transbordos |
+| CMA CGM       | `CMAMSP`       | Naviera        | Mueve contenedores, registra eventos, participa en transbordos |
+| Valencia      | `ValenciaMSP`  | Puerto         | Manipula contenedores en escala, registra carga/descarga       |
+| Rotterdam     | `RotterdamMSP` | Puerto         | Manipula contenedores en escala, registra carga/descarga       |
+| Aduanas UE    | `CustomsMSP`   | Regulador      | Lee toda la información, autoriza el despacho (`ClearCustoms`) |
+
+Además de las 6 orgs, la red lleva una **OrdererOrg** con **3 nodos ordenadores en Raft** (`orderer1`, `orderer2`, `orderer3`). Estos 3 orderers se reparten físicamente entre las navieras (Maersk, MSC, CMA) para que ninguna controle el orden de las transacciones por sí sola — esa es una de las decisiones de gobernanza clave que TradeLens no tomó.
+
+**Reglas de negocio que tendrá que respetar el chaincode:**
+
+- Crear un contenedor o registrar un evento sobre él → **solo una naviera** (no puertos, no aduanas).
+- Transbordo (cambiar de naviera) → **firma de la naviera saliente Y la entrante**.
+- Despachar aduanas (`ClearCustoms`) → **solo `CustomsMSP`**.
+- Leer / consultar el historial → **cualquier miembro** del canal.
+
 ### Gobernanza
 
 1. **¿Quién debería ser el fundador?** Valora cada opción y sus riesgos:
@@ -119,6 +175,8 @@ graph TB
     style A1 fill:#EC0000,color:#fff
     style A2 fill:#EC0000,color:#fff
 ```
+
+> 💡 **Nota sobre el diagrama**: el modelo de gobernanza muestra más participantes (4 navieras, 3 puertos, 2 aduanas) de los que vas a implementar técnicamente en la Fase 2. Esto es a propósito: ilustra cómo se vería la red real con más miembros. **En la Fase 2 trabajamos con las 6 orgs ya enumeradas** (Maersk, MSC, CMA, Valencia, Rotterdam, Aduanas UE) para que la red sea manejable en clase; los mecanismos que apliques se generalizan a cualquier número de participantes.
 
 **Principios de la propuesta:**
 
