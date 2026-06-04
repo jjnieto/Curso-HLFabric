@@ -1368,28 +1368,76 @@ go mod vendor
 
 ### 6.4 Desplegar el chaincode
 
+> 🛑 **NO COPIES ESTA SECCIÓN ENTERA DE GOLPE.** El despliegue tiene **7 sub-pasos** y uno de ellos (el 6.4.3) **requiere que TÚ copies y pegues a mano** el Package ID, un valor que solo conoces en ejecución. Si copias todo el bloque seguido, aprobarás el chaincode con el marcador `PEGA_AQUI_EL_HASH` y, aunque `approve` y `commit` parezcan funcionar, al invocar fallará con:
+>
+> ```
+> chaincode definition for 'maritimechain' exists, but chaincode is not installed
+> ```
+>
+> Ejecuta **un sub-paso cada vez**, leyendo lo que devuelve antes de pasar al siguiente.
+
+Colócate en el directorio y carga las funciones de entorno:
+
 ```bash
 cd $HOME/maritimechain/network
 source $HOME/maritimechain/env.sh
+```
 
-# 6.4.1 — Empaquetar
+#### 6.4.1 — Empaquetar (una sola vez)
+
+```bash
 set_org_maersk
 peer lifecycle chaincode package maritimechain.tar.gz \
   --path $HOME/maritimechain/chaincode/ \
   --lang golang --label maritimechain_1.0
+```
 
-# 6.4.2 — Instalar en los 6 peers
+#### 6.4.2 — Instalar en los 6 peers
+
+```bash
 for org in maersk msc cma valencia rotterdam customs; do
   set_org_$org
   peer lifecycle chaincode install maritimechain.tar.gz
 done
+```
 
-# 6.4.3 — Obtener el Package ID
+#### 6.4.3 — ✋ PARADA OBLIGATORIA: copia el Package ID a mano
+
+Pregunta a Fabric qué Package ID se ha generado:
+
+```bash
 peer lifecycle chaincode queryinstalled
-# Copia el ID con la forma: maritimechain_1.0:abcd1234...
-export CC_PACKAGE_ID=maritimechain_1.0:PEGA_AQUI_EL_HASH
+```
 
-# 6.4.4 — Aprobar desde las 6 orgs
+Verás algo así (el hash será **distinto** en tu máquina):
+
+```
+Installed chaincodes on peer:
+Package ID: maritimechain_1.0:7a9c1f...e02b, Label: maritimechain_1.0
+```
+
+**Copia ese valor completo** (todo lo que va tras `Package ID: ` y antes de la coma) y pégalo aquí, **sustituyendo `PEGA_AQUI_EL_HASH`**:
+
+```bash
+# ⚠ EDITA esta línea antes de ejecutarla. NO la dejes con PEGA_AQUI_EL_HASH.
+export CC_PACKAGE_ID=maritimechain_1.0:PEGA_AQUI_EL_HASH
+```
+
+Comprueba que lo has hecho bien — NO debe aparecer la palabra `PEGA_AQUI`:
+
+```bash
+echo "$CC_PACKAGE_ID"
+# Correcto:   maritimechain_1.0:7a9c1f...e02b
+# INCORRECTO: maritimechain_1.0:PEGA_AQUI_EL_HASH   ← si ves esto, repite el export
+```
+
+> Si `echo` te muestra `PEGA_AQUI_EL_HASH`, **párate aquí**: los pasos siguientes aprobarían un paquete inexistente y el invoke fallaría en silencio. Vuelve a copiar el hash real de `queryinstalled`.
+
+#### 6.4.4 — Aprobar desde las 6 orgs
+
+Solo cuando el `echo` muestre el hash real:
+
+```bash
 for org in maersk msc cma valencia rotterdam customs; do
   set_org_$org
   peer lifecycle chaincode approveformyorg \
@@ -1399,15 +1447,23 @@ for org in maersk msc cma valencia rotterdam customs; do
     --name maritimechain --version 1.0 \
     --package-id $CC_PACKAGE_ID --sequence 1
 done
+```
 
-# 6.4.5 — Verificar
+#### 6.4.5 — Verificar aprobaciones
+
+```bash
 peer lifecycle chaincode checkcommitreadiness \
   --channelID shipping-channel \
   --name maritimechain --version 1.0 --sequence 1 \
   --output json
 # Esperado: las 6 orgs en "true"
+```
 
-# 6.4.6 — Commit (1 vez, con los 6 --peerAddresses)
+> ⚠ **Ojo**: que las 6 salgan en `true` NO garantiza que el Package ID sea correcto — solo que las 6 orgs aprobaron **el mismo** valor (también saldría `true` si todas aprobaron el placeholder). La validación real del Package ID llega al invocar (Paso 7). El `echo` del 6.4.3 es tu única red de seguridad.
+
+#### 6.4.6 — Commit (una sola vez, con los 6 --peerAddresses)
+
+```bash
 set_org_maersk
 peer lifecycle chaincode commit \
   -o localhost:7050 --ordererTLSHostnameOverride orderer1.maritimechain.org \
@@ -1420,11 +1476,16 @@ peer lifecycle chaincode commit \
   --peerAddresses localhost:13051 --tlsRootCertFiles $PEER_VALENCIA_TLS \
   --peerAddresses localhost:15051 --tlsRootCertFiles $PEER_ROTTERDAM_TLS \
   --peerAddresses localhost:17051 --tlsRootCertFiles $PEER_CUSTOMS_TLS
+```
 
-# 6.4.7 — Verificar
+#### 6.4.7 — Verificar
+
+```bash
 peer lifecycle chaincode querycommitted --channelID shipping-channel --name maritimechain
 # Esperado: Version: 1.0, Sequence: 1, ...
 ```
+
+> 🔧 **Si ya te pasó** (aprobaste con `PEGA_AQUI_EL_HASH` y el invoke del Paso 7 falla con *"chaincode is not installed"*): no necesitas re-commitear ni cambiar de sequence. El Package ID es parte de la **aprobación local de cada org**, no de la definición del canal. Basta con repetir el **6.4.3 bien** (export del hash real + `echo` de comprobación) y volver a ejecutar el **6.4.4** (re-aprobar las 6 orgs con la misma `--sequence 1`). Los errores `requested sequence is 1, but new definition must be sequence 2` al re-hacer checkcommitreadiness/commit son **esperados e inofensivos** (la sequence 1 ya está commiteada): ignóralos y pasa directo al invoke.
 
 ---
 

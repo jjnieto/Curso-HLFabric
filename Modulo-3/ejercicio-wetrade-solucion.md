@@ -848,23 +848,72 @@ go mod vendor
 
 ### 6.4 Desplegar
 
+> 🛑 **NO COPIES ESTA SECCIÓN ENTERA DE GOLPE.** Tiene **7 sub-pasos** y uno de ellos (el 6.4.3) **requiere que TÚ copies y pegues a mano** el Package ID, un valor que solo conoces en ejecución. Si copias todo el bloque seguido, aprobarás con el marcador `PEGA_AQUI_EL_HASH` y, aunque `approve` y `commit` parezcan ir bien, al invocar fallará con:
+>
+> ```
+> chaincode definition for 'tradefinance' exists, but chaincode is not installed
+> ```
+>
+> Ejecuta **un sub-paso cada vez**, leyendo lo que devuelve antes de seguir.
+
 ```bash
 cd $HOME/tradefinance/network
 source $HOME/tradefinance/env.sh
+```
 
+#### 6.4.1 — Empaquetar (una sola vez)
+
+```bash
 set_org_santander
 peer lifecycle chaincode package tradefinance.tar.gz \
   --path $HOME/tradefinance/chaincode/ \
   --lang golang --label tradefinance_1.0
+```
 
+#### 6.4.2 — Instalar en los 3 peers
+
+```bash
 for org in santander bbva db; do
   set_org_$org
   peer lifecycle chaincode install tradefinance.tar.gz
 done
+```
 
+#### 6.4.3 — ✋ PARADA OBLIGATORIA: copia el Package ID a mano
+
+```bash
 peer lifecycle chaincode queryinstalled
-export CC_PACKAGE_ID=tradefinance_1.0:PEGA_AQUI_EL_HASH
+```
 
+Verás algo así (el hash será **distinto** en tu máquina):
+
+```
+Installed chaincodes on peer:
+Package ID: tradefinance_1.0:5b3e90...c14a, Label: tradefinance_1.0
+```
+
+**Copia ese valor completo** (lo que va tras `Package ID: ` y antes de la coma) y pégalo aquí, **sustituyendo `PEGA_AQUI_EL_HASH`**:
+
+```bash
+# ⚠ EDITA esta línea antes de ejecutarla. NO la dejes con PEGA_AQUI_EL_HASH.
+export CC_PACKAGE_ID=tradefinance_1.0:PEGA_AQUI_EL_HASH
+```
+
+Comprueba que lo has hecho bien — NO debe aparecer `PEGA_AQUI`:
+
+```bash
+echo "$CC_PACKAGE_ID"
+# Correcto:   tradefinance_1.0:5b3e90...c14a
+# INCORRECTO: tradefinance_1.0:PEGA_AQUI_EL_HASH   ← si ves esto, repite el export
+```
+
+> Si `echo` muestra `PEGA_AQUI_EL_HASH`, **párate aquí**: los pasos siguientes aprobarían un paquete inexistente y el invoke fallaría en silencio. Copia el hash real de `queryinstalled`.
+
+#### 6.4.4 — Aprobar desde las 3 orgs
+
+Solo cuando el `echo` muestre el hash real:
+
+```bash
 for org in santander bbva db; do
   set_org_$org
   peer lifecycle chaincode approveformyorg \
@@ -874,12 +923,23 @@ for org in santander bbva db; do
     --name tradefinance --version 1.0 \
     --package-id $CC_PACKAGE_ID --sequence 1
 done
+```
 
+#### 6.4.5 — Verificar aprobaciones
+
+```bash
 peer lifecycle chaincode checkcommitreadiness \
   --channelID trade-channel \
   --name tradefinance --version 1.0 --sequence 1 \
   --output json
+# Esperado: las 3 orgs en "true"
+```
 
+> ⚠ **Ojo**: que las 3 salgan en `true` NO garantiza que el Package ID sea correcto — solo que las 3 aprobaron **el mismo** valor (también saldría `true` con el placeholder). La validación real llega al invocar (Paso 7). El `echo` del 6.4.3 es tu red de seguridad.
+
+#### 6.4.6 — Commit (una sola vez, con los 3 --peerAddresses)
+
+```bash
 set_org_santander
 peer lifecycle chaincode commit \
   -o localhost:7050 --ordererTLSHostnameOverride orderer.tradefinance.com \
@@ -889,9 +949,16 @@ peer lifecycle chaincode commit \
   --peerAddresses localhost:7051  --tlsRootCertFiles $PEER_SANTANDER_TLS \
   --peerAddresses localhost:9051  --tlsRootCertFiles $PEER_BBVA_TLS \
   --peerAddresses localhost:11051 --tlsRootCertFiles $PEER_DB_TLS
-
-peer lifecycle chaincode querycommitted --channelID trade-channel --name tradefinance
 ```
+
+#### 6.4.7 — Verificar
+
+```bash
+peer lifecycle chaincode querycommitted --channelID trade-channel --name tradefinance
+# Esperado: Version: 1.0, Sequence: 1, ...
+```
+
+> 🔧 **Si ya te pasó** (aprobaste con `PEGA_AQUI_EL_HASH` y el invoke falla con *"chaincode is not installed"*): no hace falta re-commitear ni cambiar de sequence. El Package ID es parte de la **aprobación local de cada org**, no de la definición del canal. Repite el **6.4.3 bien** (export del hash real + `echo`) y vuelve a ejecutar el **6.4.4** (re-aprobar las 3 orgs con la misma `--sequence 1`). Los errores `requested sequence is 1, but new definition must be sequence 2` al re-hacer checkcommitreadiness/commit son **esperados e inofensivos** (la sequence 1 ya está commiteada): ignóralos y pasa directo al invoke.
 
 ---
 
