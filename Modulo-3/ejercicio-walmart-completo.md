@@ -1035,29 +1035,78 @@ ls vendor/github.com/hyperledger/fabric-contract-api-go/
 
 ### 7.4 Desplegar el chaincode
 
+> 🛑 **NO COPIES ESTA SECCIÓN ENTERA DE GOLPE.** El despliegue tiene **7 sub-pasos** y uno de ellos (el 7.4.3) **requiere que TÚ copies y pegues a mano** un valor que solo conoces en ejecución (el Package ID). Si copias todo el bloque seguido, aprobarás el chaincode con un valor de marcador (`PEGA_AQUI_EL_HASH`) y, aunque `approve` y `commit` parezcan funcionar, al invocar fallará con:
+>
+> ```
+> chaincode definition for 'foodtrace' exists, but chaincode is not installed
+> ```
+>
+> Ejecuta **un sub-paso cada vez**, leyendo lo que devuelve antes de pasar al siguiente.
+
+Empieza colocándote en el directorio y cargando las funciones de entorno:
+
 ```bash
 cd $HOME/foodtrace/network
 source $HOME/foodtrace/env.sh   # por si abriste terminal nueva
+```
 
-# 7.4.1 — Empaquetar (UNA vez)
+#### 7.4.1 — Empaquetar (una sola vez)
+
+```bash
 set_org_productor
 peer lifecycle chaincode package foodtrace.tar.gz \
   --path $HOME/foodtrace/chaincode/ \
   --lang golang --label foodtrace_1.0
+```
 
-# 7.4.2 — Instalar en los 4 peers
+#### 7.4.2 — Instalar en los 4 peers
+
+```bash
 for org in productor distribuidor supermercado regulador; do
   set_org_$org
   peer lifecycle chaincode install foodtrace.tar.gz
 done
+```
 
-# 7.4.3 — Obtener el Package ID
+Cada instalación imprime una línea con el Package ID. Lo verás también en el siguiente paso.
+
+#### 7.4.3 — ✋ PARADA OBLIGATORIA: copia el Package ID a mano
+
+Este es el sub-paso que **no se puede automatizar copiando**. Primero pregunta a Fabric qué Package ID se ha generado:
+
+```bash
 peer lifecycle chaincode queryinstalled
-# Copia el ID que aparece. Tendrá la forma: foodtrace_1.0:abcdef123456...
-# Sustitúyelo en la línea de abajo:
-export CC_PACKAGE_ID=foodtrace_1.0:PEGA_AQUI_EL_HASH
+```
 
-# 7.4.4 — Aprobar desde las 4 orgs
+Verás algo así (el hash será **distinto** en tu máquina):
+
+```
+Installed chaincodes on peer:
+Package ID: foodtrace_1.0:302e49cb2e3619702a0eae19c3b4c0717a63e0ca72fa75af2bae7cea40622000, Label: foodtrace_1.0
+```
+
+Ahora **copia ese valor completo** (todo lo que va después de `Package ID: ` y antes de la coma) y pégalo en este comando, **sustituyendo el texto `PEGA_AQUI_EL_HASH`**:
+
+```bash
+# ⚠ EDITA esta línea antes de ejecutarla. NO la dejes con PEGA_AQUI_EL_HASH.
+export CC_PACKAGE_ID=foodtrace_1.0:PEGA_AQUI_EL_HASH
+```
+
+Comprueba que lo has hecho bien — el siguiente comando NO debe contener la palabra `PEGA_AQUI`:
+
+```bash
+echo "$CC_PACKAGE_ID"
+# Correcto:   foodtrace_1.0:302e49cb2e36...40622000
+# INCORRECTO: foodtrace_1.0:PEGA_AQUI_EL_HASH   ← si ves esto, repite el export
+```
+
+> Si `echo` te muestra `PEGA_AQUI_EL_HASH`, **párate aquí**: todos los pasos siguientes fallarían en silencio (aprobarían un paquete inexistente). Vuelve a copiar el hash real de `queryinstalled`.
+
+#### 7.4.4 — Aprobar desde las 4 orgs
+
+Solo cuando el `echo` anterior muestre el hash real, ejecuta:
+
+```bash
 for org in productor distribuidor supermercado regulador; do
   set_org_$org
   peer lifecycle chaincode approveformyorg \
@@ -1068,16 +1117,24 @@ for org in productor distribuidor supermercado regulador; do
     --package-id $CC_PACKAGE_ID --sequence 1 \
     --collections-config $HOME/foodtrace/network/collections_config.json
 done
+```
 
-# 7.4.5 — Verificar aprobaciones
+#### 7.4.5 — Verificar aprobaciones
+
+```bash
 peer lifecycle chaincode checkcommitreadiness \
   --channelID trazabilidad-channel \
   --name foodtrace --version 1.0 --sequence 1 \
   --collections-config $HOME/foodtrace/network/collections_config.json \
   --output json
 # Esperado: las 4 orgs en "true"
+```
 
-# 7.4.6 — Commit (UNA vez, recogiendo endorsements de las 4 orgs)
+> ⚠ **Ojo**: que las 4 salgan en `true` NO garantiza que el Package ID sea correcto — solo que las 4 orgs aprobaron **el mismo** valor. Si todas aprobaron el placeholder, también saldrá `true`. La validación real del Package ID llega al invocar (Paso 8). Por eso el `echo` del 7.4.3 es tu única red de seguridad aquí.
+
+#### 7.4.6 — Commit (una sola vez, recogiendo endorsements de las 4 orgs)
+
+```bash
 set_org_productor
 peer lifecycle chaincode commit \
   -o localhost:7050 --ordererTLSHostnameOverride orderer.foodtrace.com \
@@ -1089,12 +1146,17 @@ peer lifecycle chaincode commit \
   --peerAddresses localhost:9051  --tlsRootCertFiles $PEER_DISTRIBUIDOR_TLS \
   --peerAddresses localhost:11051 --tlsRootCertFiles $PEER_SUPERMERCADO_TLS \
   --peerAddresses localhost:13051 --tlsRootCertFiles $PEER_REGULADOR_TLS
+```
 
-# 7.4.7 — Verificar
+#### 7.4.7 — Verificar
+
+```bash
 peer lifecycle chaincode querycommitted --channelID trazabilidad-channel --name foodtrace
 # Esperado: Committed chaincode definition for chaincode 'foodtrace' on channel 'trazabilidad-channel':
 #   Version: 1.0, Sequence: 1, ...
 ```
+
+> 🔧 **Si ya te pasó** (aprobaste con `PEGA_AQUI_EL_HASH` y el invoke del Paso 8 falla con *"chaincode is not installed"*): no necesitas re-commitear ni cambiar de sequence. El Package ID es parte de la **aprobación local de cada org**, no de la definición del canal. Basta con repetir el **7.4.3 bien** (export del hash real + `echo` de comprobación) y volver a ejecutar el **7.4.4** (re-aprobar las 4 orgs con la misma `--sequence 1`). Tras eso, el invoke funcionará sin tocar el commit.
 
 ---
 
