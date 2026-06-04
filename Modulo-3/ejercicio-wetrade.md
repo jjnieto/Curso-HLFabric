@@ -17,17 +17,26 @@ Tu misión: montar una red Fabric a escala de aula con **3 bancos europeos** (Sa
 ```mermaid
 sequenceDiagram
     participant PV as PYME Vendedora<br/>(exporta)
-    participant BV as Banco Vendedor
-    participant BC as Banco Comprador
+    participant BV as Banco Vendedor<br/>(Santander)
+    participant BC as Banco Comprador<br/>(BBVA)
     participant PC as PYME Compradora<br/>(importa)
 
-    PC->>BC: Quiero comprar mercancía a PV por 50.000€
-    BC->>BV: Crea la operación y nos comprometemos
-    BV->>BV: Aprueba la operación
-    PV->>PC: Envía la mercancía
-    PC->>BC: Confirma la recepción
-    BC->>BV: Libera el pago (cualquiera de los dos puede)
+    Note over PC,BC: Todo arranca cuando una PYME llama a su banco
+    PC->>BC: "Quiero comprar a PV por 50.000€"
+    BC->>BV: invoke CreateOperation (firma BBVA)
+    Note over BV,PV: La exportadora confirma condiciones con su banco
+    PV->>BV: "Acepto vender bajo estas condiciones"
+    BV->>BV: invoke ApproveOperation (firma Santander)
+    PV->>PC: Envía la mercancía físicamente
+    Note over PC,BC: La compradora recibe la mercancía y avisa a su banco
+    PC->>BC: "Recibí lo acordado, confirma entrega"
+    BC->>BC: invoke ConfirmDelivery (firma BBVA)
+    Note over PV,BV: Cualquiera de las 2 PYMEs puede pedir liberar el pago
+    PV->>BV: "Libera el pago"
+    BV->>BV: invoke ReleasePayment (firma Santander)
 ```
+
+**Ojo al detalle**: las PYMEs nunca tocan Fabric directamente. Cada una habla con SU banco (por banca-online, no por blockchain). Es el banco el que **firma con su MSP** y mete la transacción en el canal. El chaincode lo único que ve es: *"el MSP X está pidiendo la acción Y para la operación Z"* — y comprueba si ese MSP tiene derecho a hacerlo.
 
 **Problema que resuelve**: sin esto, una PYME no se fía de exportar a un cliente en otro país, y el banco del comprador no se fía de prestar. Fabric da un ledger compartido donde los 3 bancos ven el estado de la operación en tiempo real, sin tener que llamarse por teléfono.
 
@@ -35,23 +44,33 @@ sequenceDiagram
 
 ## Fase 1: Diseño sobre el papel
 
-### Actores y organizaciones
+### Actores: dos capas (clientes + bancos)
 
-> 💡 **Por simplicidad se considerará un único banco como organización por cada entidad.** En un caso real cada banco tendría a su vez muchos clientes (PYMEs) registrados como usuarios. Aquí, para no complicar, los clientes los representaremos como simples strings dentro de las transacciones (no como usuarios Fabric con certificado).
-
-La red **TradeFinance** tiene **3 organizaciones**, una por banco. **No hay regulador** en esta versión simplificada — los 3 bancos confían mutuamente porque están bajo la misma supervisión del BCE.
+> 💡 **El sistema tiene dos tipos de actores muy distintos**, y entender quién hace qué es la mitad del ejercicio:
+>
+> - Las **PYMEs (clientes)** son los actores del negocio real: la exportadora quiere vender, la importadora quiere comprar. Son quienes inician y disparan cada paso, pero **NO interactúan directamente con Fabric** — no tienen certificado MSP, no son usuarios de la red.
+> - Los **bancos (organizaciones)** son los actores de la red Fabric: tienen peers, MSP propio y son quienes firman las transacciones. Actúan **como proxy de su cliente PYME**: cuando una PYME les pide algo por su canal de banca-online, el banco lo traduce en un `invoke` al chaincode.
 
 ```mermaid
 graph LR
-    BS["Santander<br/>SantanderMSP"] --> CANAL[("Canal<br/>trade-channel")]
-    BB["BBVA<br/>BBVAMSP"] --> CANAL
-    BD["Deutsche Bank<br/>DBMSP"] --> CANAL
+    PE["PYME Exportadora<br/>pyme-export-001"] -->|"banca online"| BS
+    PI["PYME Importadora<br/>pyme-import-042"] -->|"banca online"| BB
+    PD2["Otras PYMEs<br/>(clientes alemanes)"] -->|"banca online"| BD
 
+    BS["Santander<br/>SantanderMSP<br/>(peer + MSP)"] --> CANAL[("Canal<br/>trade-channel")]
+    BB["BBVA<br/>BBVAMSP<br/>(peer + MSP)"] --> CANAL
+    BD["Deutsche Bank<br/>DBMSP<br/>(peer + MSP)"] --> CANAL
+
+    style PE fill:#fff3cd,color:#000
+    style PI fill:#fff3cd,color:#000
+    style PD2 fill:#fff3cd,color:#000
     style BS fill:#EC0000,color:#fff
     style BB fill:#22627E,color:#fff
     style BD fill:#B45D09,color:#fff
     style CANAL fill:#666,color:#fff
 ```
+
+**Organizaciones (los que firman en Fabric)**
 
 | Organización  | MSP ID         | Rol funcional                                                                              |
 |---------------|----------------|--------------------------------------------------------------------------------------------|
@@ -59,22 +78,55 @@ graph LR
 | BBVA          | `BBVAMSP`      | Banco español; mismo rol que Santander en cualquier operación dada                         |
 | Deutsche Bank | `DBMSP`        | Banco alemán; idem                                                                         |
 
-**Reglas de negocio que tendrá que respetar el chaincode**:
+**Clientes (los que disparan cada paso desde fuera de la red)**
 
-- **Crear** una operación: el banco del comprador (`buyerOrg`) es quien la inicia. El banco del vendedor (`sellerOrg`) viene como argumento.
-- **Aprobar** una operación: solo `sellerOrg`.
-- **Confirmar entrega**: solo `buyerOrg`.
-- **Liberar pago**: cualquiera de los dos bancos involucrados (`sellerOrg` o `buyerOrg`).
-- **Leer / historial**: cualquier banco del canal.
+| Cliente (PYME)            | Identificador            | Banco con el que opera | Rol en la operación de ejemplo                                                |
+|---------------------------|--------------------------|------------------------|--------------------------------------------------------------------------------|
+| PYME Exportadora          | `pyme-export-001`        | Santander              | Pide a su banco que apruebe la operación y, al final, espera cobrar           |
+| PYME Importadora          | `pyme-import-042`        | BBVA                   | Inicia la compra; al recibir mercancía pide a BBVA que confirme la entrega    |
 
-### Máquina de estados
+> ⚠ **En este ejercicio simplificado, los identificadores de cliente (`pyme-export-001`, etc.) son simples strings** que viajan dentro de la `Operation` para dejar trazabilidad. En un sistema real cada PYME tendría su usuario en el portal del banco y, opcionalmente, un certificado propio. El control de acceso del chaincode se hace **por MSP del banco que firma**, no por el cliente. La regla siempre es: *"¿este banco tiene derecho a hacer esta acción para su cliente?"*.
+
+**Reglas de negocio que tendrá que respetar el chaincode** (cada regla nace de una petición de un cliente, ejecutada por su banco):
+
+| Acción            | La pide…                          | La firma en Fabric…           |
+|-------------------|-----------------------------------|-------------------------------|
+| `CreateOperation` | La PYME importadora               | Su banco (`buyerOrg`)         |
+| `ApproveOperation`| La PYME exportadora               | Su banco (`sellerOrg`)        |
+| `ConfirmDelivery` | La PYME importadora (recibió ya)  | Su banco (`buyerOrg`)         |
+| `ReleasePayment`  | Cualquiera de las 2 PYMEs         | Su banco respectivo           |
+| `ReadOperation`   | Cualquier banco / supervisor      | Cualquier banco del canal     |
+
+### Máquina de estados (con quién dispara cada transición)
 
 ```
-created → approved → delivered → paid
-    ↘ rejected
+                       PYME Importadora pide a su banco (BBVA)
+                                       │
+                                       ▼
+                                   ┌─────────┐
+                                   │ created │
+                                   └────┬────┘
+                       PYME Exportadora pide a su banco (Santander)
+                                       │
+                                       ▼
+                                   ┌──────────┐
+                                   │ approved │
+                                   └────┬─────┘
+                       PYME Importadora recibe mercancía y avisa a BBVA
+                                       │
+                                       ▼
+                                   ┌───────────┐
+                                   │ delivered │
+                                   └────┬──────┘
+                       Cualquiera de las 2 PYMEs pide liberar pago
+                                       │
+                                       ▼
+                                    ┌──────┐
+                                    │ paid │
+                                    └──────┘
 ```
 
-> 💡 **Decisión**: para mantenerlo sencillo NO incluimos disputas ni timeouts. El happy path es lineal.
+> 💡 **Decisión**: para mantenerlo sencillo NO incluimos disputas ni timeouts. El happy path es lineal y siempre lo dispara una PYME por banca-online; el banco solo "traduce" esa petición a un invoke de Fabric.
 
 ### Privacidad y política de endorsement
 

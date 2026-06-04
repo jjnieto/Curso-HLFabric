@@ -8,6 +8,24 @@
 
 ---
 
+## Recordatorio: el modelo tiene 2 capas de actores
+
+Antes de meterse en YAML, retener el modelo mental que se vio en la Fase 1 del ejercicio:
+
+- **PYMEs (clientes — exportadora e importadora)**: son las que disparan cada paso del flujo desde el portal de banca-online de su banco. **NO interactúan con Fabric directamente** y por eso en la red **no son una organización ni un usuario MSP**; aparecen únicamente como strings (`sellerClient`, `buyerClient`) dentro de cada `Operation` para dejar trazabilidad.
+- **Bancos (Santander / BBVA / Deutsche Bank)**: son las únicas organizaciones de la red, con MSP propio y peers. Reciben la petición de su PYME, la traducen a un `invoke` y firman la transacción con su MSP. Todo el control de acceso del chaincode se hace **por MSP del banco**, NUNCA por el clientID.
+
+Mapeo de la operación de ejemplo (`OP-2026-000123`) que se prueba en la Fase 3:
+
+| Quién dispara la acción       | Banco que firma en Fabric | Función invocada    |
+|-------------------------------|---------------------------|---------------------|
+| PYME importadora (BBVA)       | BBVAMSP                   | `CreateOperation`   |
+| PYME exportadora (Santander)  | SantanderMSP              | `ApproveOperation`  |
+| PYME importadora (BBVA)       | BBVAMSP                   | `ConfirmDelivery`   |
+| Cualquiera de las 2 PYMEs     | El banco respectivo       | `ReleasePayment`    |
+
+---
+
 ## Estructura final de directorios
 
 ```
