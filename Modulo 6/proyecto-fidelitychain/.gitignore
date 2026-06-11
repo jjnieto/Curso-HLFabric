@@ -1,0 +1,14 @@
+# Datos generados por cryptogen
+network/crypto-config/
+
+# Bloque génesis y artefactos del canal
+network/channel-artifacts/
+
+# Chaincode empaquetado y vendoring de Go
+*.tar.gz
+chaincode/chaincode-go/vendor/
+chaincode/chaincode-go/go.sum
+
+# App cliente
+application/node_modules/
+application/package-lock.json

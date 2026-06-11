@@ -1,0 +1,32 @@
+OrdererOrgs:
+  - Name: Orderer
+    Domain: fidelitychain.com
+    EnableNodeOUs: true
+    Specs:
+      - Hostname: orderer
+        SANS:
+          - localhost
+          - 127.0.0.1
+
+PeerOrgs:
+  - Name: Hotel
+    Domain: hotel.fidelitychain.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 1
+
+  - Name: Cafeteria
+    Domain: cafeteria.fidelitychain.com
+    EnableNodeOUs: true
+    Template:
+      Count: 1
+      SANS:
+        - localhost
+        - 127.0.0.1
+    Users:
+      Count: 1

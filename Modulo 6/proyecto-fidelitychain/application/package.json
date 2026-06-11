@@ -1,0 +1,13 @@
+{
+  "name": "fidelitychain-app",
+  "version": "1.0.0",
+  "description": "Aplicacion cliente para FidelityChain",
+  "scripts": {
+    "hotel": "node hotel-app.js",
+    "cafeteria": "node cafeteria-app.js"
+  },
+  "dependencies": {
+    "fabric-network": "^2.2.20",
+    "fabric-ca-client": "^2.2.20"
+  }
+}
