@@ -400,4 +400,4 @@ peer chaincode query -C fidelity-channel -n fidelitypoints \
 ---
 
 **Anterior:** [03 - Chaincode](03-chaincode.md)
-**Siguiente:** [05 - Aplicación cliente](05-aplicación-cliente.md)
+**Siguiente:** [05 - Aplicación cliente](05-aplicacion-cliente.md)

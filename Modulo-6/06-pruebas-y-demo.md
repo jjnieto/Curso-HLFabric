@@ -253,4 +253,4 @@ Si algun alumno quiere ir mas alla, estas son extensiones interesantes:
 
 ---
 
-**Anterior:** [05 - Aplicación cliente](05-aplicación-cliente.md)
+**Anterior:** [05 - Aplicación cliente](05-aplicacion-cliente.md)

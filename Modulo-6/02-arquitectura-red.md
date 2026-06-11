@@ -379,5 +379,5 @@ Cada uno de estos pasos se detalla en los documentos siguientes (04 y 05).
 
 ---
 
-**Anterior:** [01 - Diseño funcional](01-diseño-funcional.md)
+**Anterior:** [01 - Diseño funcional](01-diseno-funcional.md)
 **Siguiente:** [03 - Chaincode](03-chaincode.md)
