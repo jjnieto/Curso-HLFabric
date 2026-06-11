@@ -18,33 +18,17 @@ Proyecto del Módulo 6: programa de fidelización descentralizado entre **Hotel*
 
 Material crypto generado con **cryptogen** (no Fabric CA), todo on-disk en `network/crypto-config/`.
 
-## Obtener el proyecto (sin clonar el repo entero)
+## Obtener el proyecto
 
-> Todo lo que viene después asume que tienes esta carpeta en local. **No hace
-> falta clonar el repo completo del curso** (los seis módulos, slides, PDFs…):
-> con un *sparse checkout* te bajas solo `proyecto-fidelitychain`.
-
-Solo necesitas `git` (compruébalo con `git --version`). El repo del curso es
-privado, así que el `clone` te pedirá tus credenciales de GitHub.
+Solo necesitas `git` (compruébalo con `git --version`). El repo es **público**,
+así que el `clone` no te pedirá ninguna credencial.
 
 ```bash
-# 1. Clona los metadatos, sin descargar archivos todavía.
-#    Lo clonamos a la carpeta "fidelitychain" (no "fabric") para no chocar
-#    con un posible ~/fabric donde tengas los binarios de Fabric.
-git clone --filter=blob:none --sparse https://github.com/jjnieto/fabric.git fidelitychain
-cd fidelitychain
-
-# 2. Materializa SOLO la carpeta del proyecto (nada del resto de módulos)
-git sparse-checkout set "docs/Modulo 6/proyecto-fidelitychain"
-
-# 3. Sitúate dentro: desde aquí funcionan todos los comandos de esta guía
-cd "docs/Modulo 6/proyecto-fidelitychain"
+git clone https://github.com/jjnieto/Curso-HLFabric.git
+cd Curso-HLFabric/Modulo-6/proyecto-fidelitychain
 ```
 
-`--filter=blob:none` evita descargar el contenido del resto del repo y `--sparse`
-arranca con el árbol de trabajo vacío; `git sparse-checkout set` trae al disco
-únicamente el proyecto. (Si algún día quieres otra carpeta, añádela con otro
-`git sparse-checkout set ...`.)
+Desde ese directorio funcionan todos los comandos de esta guía.
 
 ## Prerequisitos
 
@@ -124,7 +108,7 @@ Repite el bloque del **Paso 0**. Cuando no aparezca ningún `FALTA`, ya puedes s
 ## Quickstart
 
 Desde el directorio del proyecto (donde te dejó el paso _Obtener el proyecto_:
-`fidelitychain/docs/Modulo 6/proyecto-fidelitychain`):
+`Curso-HLFabric/Modulo-6/proyecto-fidelitychain`):
 
 ```bash
 # 1. Levantar red + canal + peers unidos
@@ -252,7 +236,7 @@ Tira contenedores, volúmenes Docker, contenedores efímeros del chaincode (`dev
 
 | Material | Para quién | Qué hace |
 |----------|-----------|----------|
-| `01..07-*.md` (en `docs/Modulo 6/`) | Alumno | Explica decisiones paso a paso. El alumno construye los archivos a mano. |
+| `01..07-*.md` (en `Modulo-6/`) | Alumno | Explica decisiones paso a paso. El alumno construye los archivos a mano. |
 | Este `proyecto-fidelitychain/` con scripts y este README | Profesor (demo, iteración rápida) | Todo el código real listo para arrancar de un tirón. |
 
 Los `.md` siguen siendo la **referencia canónica del porqué**; este directorio es el **cómo automatizado**. No tocar los `.md` salvo para corregir errores conceptuales.
