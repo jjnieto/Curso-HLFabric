@@ -12,6 +12,19 @@ require_cmd go
 require_cmd docker
 ensure_fabric_cfg_path
 
+# El peer compila el chaincode Go dentro de imagenes que NO son servicios del
+# compose (ccenv = compilador, baseos = runtime). Si no estan en local, el
+# `chaincode install` falla con "No such image". Las aseguramos aqui.
+log_step "0/7 Imágenes de build del chaincode"
+for img in hyperledger/fabric-ccenv:2.5 hyperledger/fabric-baseos:2.5; do
+    if docker image inspect "$img" >/dev/null 2>&1; then
+        log_info "$img ya está en local"
+    else
+        log_info "Descargando $img"
+        docker pull "$img"
+    fi
+done
+
 CC_DIR="$CHAINCODE_DIR/chaincode-go"
 PACKAGE_FILE="$PROJECT_DIR/${CHAINCODE_NAME}.tar.gz"
 
