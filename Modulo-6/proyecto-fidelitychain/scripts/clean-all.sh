@@ -7,8 +7,10 @@ log_step "Bajando contenedores y borrando volúmenes"
 docker compose -f "$NETWORK_DIR/docker/docker-compose.yaml" down -v --remove-orphans 2>/dev/null || true
 
 log_step "Borrando contenedores de chaincode (creados dinámicamente por los peers)"
-docker ps -a --format '{{.Names}}' | grep -E '^dev-peer0\.' | xargs -r docker rm -f
-docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^dev-peer0\.' | xargs -r docker rmi -f
+# `|| true` para que un grep sin coincidencias no aborte el script (set -e):
+# si no hay contenedores/imágenes dev-peer, seguimos con la limpieza.
+docker ps -a --format '{{.Names}}' | grep -E '^dev-peer0\.' | xargs -r docker rm -f || true
+docker images --format '{{.Repository}}:{{.Tag}}' | grep -E '^dev-peer0\.' | xargs -r docker rmi -f || true
 
 log_step "Borrando material crypto y artefactos"
 rm -rf "$CRYPTO_DIR"
