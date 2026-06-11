@@ -60,15 +60,34 @@ require_cmd() {
 }
 
 # Detecta FABRIC_CFG_PATH (donde vive core.yaml). Lo necesita `peer`.
-# Respeta el ya exportado, si no busca rutas típicas.
+# Respeta el ya exportado; si no, lo deriva del propio binario `peer`
+# (install-fabric.sh deja bin/ y config/ como hermanos) y, como ultimo
+# recurso, prueba rutas tipicas.
 ensure_fabric_cfg_path() {
+    # 1. Respeta un FABRIC_CFG_PATH ya valido.
     if [ -n "${FABRIC_CFG_PATH:-}" ] && [ -f "$FABRIC_CFG_PATH/core.yaml" ]; then
         return 0
     fi
+
+    # 2. Deriva de la ubicacion de `peer`: .../bin/peer -> .../config
+    local peer_bin
+    peer_bin="$(command -v peer 2>/dev/null || true)"
+    if [ -n "$peer_bin" ]; then
+        local from_bin
+        from_bin="$(cd "$(dirname "$(readlink -f "$peer_bin")")/.." 2>/dev/null && pwd)/config"
+        if [ -f "$from_bin/core.yaml" ]; then
+            export FABRIC_CFG_PATH="$from_bin"
+            log_info "FABRIC_CFG_PATH detectado junto a 'peer' en $from_bin"
+            return 0
+        fi
+    fi
+
+    # 3. Rutas tipicas como ultimo recurso.
     local candidates=(
+        "$HOME/fabric/config"
         "$HOME/fabric/fabric-samples/config"
-        "$HOME/practica01/config"
         "$HOME/fabric-samples/config"
+        "$HOME/practica01/config"
         "/opt/fabric/config"
     )
     for p in "${candidates[@]}"; do
@@ -78,6 +97,7 @@ ensure_fabric_cfg_path() {
             return 0
         fi
     done
+
     log_err "No encuentro core.yaml. Exporta FABRIC_CFG_PATH apuntando al directorio config/ de Fabric."
     exit 1
 }

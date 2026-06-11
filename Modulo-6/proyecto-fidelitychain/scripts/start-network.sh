@@ -34,8 +34,9 @@ GENESIS_BLOCK="$NETWORK_DIR/channel-artifacts/$CHANNEL_NAME.block"
 if [ -f "$GENESIS_BLOCK" ]; then
     log_info "Ya existe $GENESIS_BLOCK — no se regenera."
 else
-    export FABRIC_CFG_PATH="$NETWORK_DIR"
-    (cd "$NETWORK_DIR" && configtxgen -profile FidelityChannel \
+    # FABRIC_CFG_PATH local al comando (configtx.yaml vive en NETWORK_DIR);
+    # no lo exportamos global para no pisar el que necesita `peer` (core.yaml).
+    (cd "$NETWORK_DIR" && FABRIC_CFG_PATH="$NETWORK_DIR" configtxgen -profile FidelityChannel \
         -outputBlock "$GENESIS_BLOCK" \
         -channelID "$CHANNEL_NAME")
     log_ok "Bloque génesis: $GENESIS_BLOCK"
