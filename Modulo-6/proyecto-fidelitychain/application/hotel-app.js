@@ -59,7 +59,8 @@ async function main() {
                 case '4': {
                     const id = await ask('DNI del cliente: ');
                     const result = await contract.evaluateTransaction('ClientHistory', id.trim());
-                    const history = JSON.parse(result.toString());
+                    const raw = result.toString();
+                    const history = raw ? JSON.parse(raw) : [];
                     if (!history || history.length === 0) {
                         console.log('\nEl cliente no tiene movimientos.\n');
                     } else {
@@ -83,7 +84,8 @@ async function main() {
                 }
                 case '6': {
                     const result = await contract.evaluateTransaction('GetAllClients');
-                    const clients = JSON.parse(result.toString());
+                    const raw = result.toString();
+                    const clients = raw ? JSON.parse(raw) : [];
                     if (!clients || clients.length === 0) {
                         console.log('\nNo hay clientes registrados.\n');
                     } else {
