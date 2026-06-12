@@ -91,15 +91,15 @@ graph TB
 
 Responde corto y razonado.
 
-**P1.** ¿Por qué la red usa dos canales separados en lugar de un único canal con las tres organizaciones?
+**P1.** Justifica qué aporta la topología de canales elegida en el diagrama frente a la alternativa de tener a las tres organizaciones conviviendo en un mismo canal.
 
-**P2.** Un compañero propone otra solución: «usad UN solo canal con las tres organizaciones y meted los precios en una Private Data Collection, así cada proveedor no ve los precios del otro». ¿Resuelve esto el problema del enunciado? ¿Por qué sí o por qué no?
+**P2.** Imagina que el arquitecto hubiera optado por una sola red con las tres organizaciones y hubiese guardado los precios de cada pedido en una colección de datos privados accesible solo para AutoMontajes y el proveedor correspondiente. ¿Bastaría ese enfoque para cumplir todo lo que pide el enunciado? Argumenta tu respuesta.
 
-**P3.** En el diagrama no aparece ninguna CA. ¿Es porque se ha simplificado el diagrama o realmente no hacen falta las CAs de las organizaciones?
+**P3.** El diagrama no representa ninguna autoridad certificadora. ¿Significa eso que esta red puede prescindir de ellas, o se trata simplemente de una omisión para no recargar el dibujo?
 
-**P4.** Mira atentamente el orderer. ¿Qué fallo grave ves en este diseño?
+**P4.** Fíjate bien en cómo está planteado el servicio de ordenación. ¿Detectas alguna debilidad seria en esa parte del diseño?
 
-**P5.** ¿Cuántos chaincodes son necesarios, como mínimo, y cuáles serían las políticas de endorsement de cada uno?
+**P5.** ¿Qué número mínimo de contratos inteligentes haría falta para este escenario y qué regla de aprobación (endorsement) asignarías a cada uno?
 
 ---
 
